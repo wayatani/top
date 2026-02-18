@@ -1,0 +1,245 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>わやたに | Infinite Maze / Navigation</title>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --ui-font: 'Helvetica Neue', Arial, sans-serif;
+            --black: #000000;
+            --white: #ffffff;
+        }
+
+        body {
+            margin: 0;
+            background: var(--white);
+            overflow: hidden;
+            font-family: var(--ui-font);
+            cursor: grab;
+        }
+
+            body:active {
+                cursor: grabbing;
+            }
+
+        /* ロゴ */
+        #ui-header {
+            position: fixed;
+            top: 40px;
+            left: 40px;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 900;
+            border: 2px solid var(--black);
+            padding: 5px 15px;
+            background: var(--white);
+            display: inline-block;
+            pointer-events: auto;
+            letter-spacing: -1px;
+        }
+
+        /* 右側ナビゲーションコンテナ */
+        #nav-container {
+            position: fixed;
+            right: 40px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            text-align: right;
+            pointer-events: none;
+        }
+
+        /* リンクスタイル */
+        .side-link {
+            pointer-events: auto;
+            text-decoration: none;
+            color: var(--black);
+            font-weight: 900;
+            font-size: 24px;
+            letter-spacing: 2px;
+            transition: opacity 0.2s, transform 0.2s;
+            display: block;
+        }
+
+            .side-link:hover {
+                opacity: 0.5;
+                transform: translateX(-10px);
+            }
+
+        .status {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            font-family: monospace;
+            font-size: 9px;
+            opacity: 0.3;
+            pointer-events: none;
+            text-transform: uppercase;
+        }
+
+        @media (max-width: 768px) {
+            .side-link {
+                font-size: 18px;
+            }
+
+            #nav-container {
+                right: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-header">
+        <h1 class="logo">わやたに</h1>
+    </div>
+
+    <nav id="nav-container">
+        <a href="https://your-profile-page-url.com" target="_blank" class="side-link">PROFILE</a>
+        <a href="https://your-works-page-url.com" target="_blank" class="side-link">WORKS</a>
+        <a href="https://your-shop-page-url.com" target="_blank" class="side-link">SHOP</a>
+        <a href="mailto:your-email@example.com" target="_blank" class="side-link">CONTACT</a>
+    </nav>
+
+    <div class="status">MAZE_ENGINE: RECOVERED // STATUS: INFINITE_DRAWING</div>
+
+    <script type="module">import * as THREE from 'three';
+
+        let scene, camera, renderer, clock;
+        let segments = [];
+        let isDragging = false;
+        let targetRotX = 0, targetRotY = 0;
+        let previousMouseX = 0, previousMouseY = 0;
+
+        const UNIT = 40;
+        let currentPos = new THREE.Vector3(0, 0, 0);
+        let currentDir = new THREE.Vector3(0, 0, -1);
+        let pathPoints = [];
+
+        init();
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xffffff);
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+            camera.position.set(0, 0, 0);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            clock = new THREE.Clock();
+
+            // 迷路の初期生成
+            for (let i = 0; i < 40; i++) spawnSegment();
+
+            // ドラッグ操作系
+            window.addEventListener('mousedown', (e) => {
+                if (e.target.tagName === 'A') return;
+                isDragging = true; previousMouseX = e.clientX; previousMouseY = e.clientY;
+            });
+            window.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                targetRotY -= (e.clientX - previousMouseX) * 0.005;
+                targetRotX -= (e.clientY - previousMouseY) * 0.005;
+                targetRotX = Math.max(-0.6, Math.min(0.6, targetRotX));
+                previousMouseX = e.clientX; previousMouseY = e.clientY;
+            });
+            window.addEventListener('mouseup', () => isDragging = false);
+            window.addEventListener('resize', onWindowResize);
+
+            animate();
+        }
+
+        function spawnSegment() {
+            const group = new THREE.Group();
+            const material = new THREE.LineBasicMaterial({ color: 0x000000 });
+            const s = UNIT / 2;
+
+            const pts = [
+                [-s, -s, 0], [s, -s, 0], [s, s, 0], [-s, s, 0], [-s, -s, 0],
+                [-s, -s, -UNIT], [s, -s, -UNIT], [s, s, -UNIT], [-s, s, -UNIT], [-s, -s, -UNIT],
+                null, [s, -s, 0], [s, -s, -UNIT], null, [s, s, 0], [s, s, -UNIT], null, [-s, s, 0], [-s, s, -UNIT]
+            ];
+
+            let temp = [];
+            pts.forEach(p => {
+                if (p === null) { draw(temp, group, material); temp = []; }
+                else temp.push(new THREE.Vector3(...p));
+            });
+            draw(temp, group, material);
+
+            group.position.copy(currentPos);
+            group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), currentDir);
+            scene.add(group);
+            segments.push(group);
+            pathPoints.push(currentPos.clone());
+
+            currentPos.add(currentDir.clone().multiplyScalar(UNIT));
+            if (Math.random() < 0.25) {
+                const turn = Math.random() > 0.5 ? Math.PI / 2 : -Math.PI / 2;
+                currentDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), turn).round();
+            }
+        }
+
+        function draw(pts, group, mat) {
+            if (pts.length < 2) return;
+            const geom = new THREE.BufferGeometry().setFromPoints(pts);
+            group.add(new THREE.Line(geom, mat));
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = clock.getElapsedTime();
+            const speed = 0.8;
+
+            if (pathPoints.length > 5) {
+                const nextTarget = pathPoints[1];
+                const moveVec = new THREE.Vector3().subVectors(nextTarget, camera.position);
+                if (moveVec.length() > 1) {
+                    moveVec.normalize().multiplyScalar(speed);
+                    camera.position.add(moveVec);
+                    camera.lookAt(pathPoints[2] || nextTarget);
+                } else {
+                    pathPoints.shift(); spawnSegment();
+                }
+            }
+
+            segments.forEach((seg, idx) => {
+                const wobble = 0.005;
+                seg.rotation.x += (Math.random() - 0.5) * wobble;
+                seg.rotation.y += (Math.random() - 0.5) * wobble;
+                if (camera.position.distanceTo(seg.position) > 1200) {
+                    scene.remove(seg); segments.splice(idx, 1);
+                }
+            });
+
+            camera.rotation.x += targetRotX;
+            camera.rotation.y += targetRotY;
+            if (!isDragging) { targetRotX *= 0.95; targetRotY *= 0.95; }
+
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }</script>
+</body>
+</html>
