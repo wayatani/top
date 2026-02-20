@@ -21,7 +21,6 @@
         body { margin: 0; background: var(--white); overflow: hidden; font-family: var(--ui-font); cursor: grab; }
         body:active { cursor: grabbing; }
 
-        /* --- UI Elements --- */
         #ui-header { position: fixed; top: 40px; left: 40px; z-index: 1000; }
         .logo { 
             font-size: 24px; font-weight: 900; border: 3px solid var(--black); 
@@ -29,62 +28,47 @@
             cursor: pointer; letter-spacing: -1px; text-decoration: none; color: var(--black);
         }
 
-        /* 右側ナビゲーションの調整 */
         #nav-container {
             position: fixed; right: 40px; top: 50%; transform: translateY(-50%);
             z-index: 1000; display: flex; flex-direction: column; gap: 20px; text-align: right;
-            width: auto; /* 幅を自動調整 */
         }
         .side-btn {
             background: none; border: none; cursor: pointer;
             color: var(--black); font-weight: 900; font-size: 24px;
             letter-spacing: 2px; transition: 0.2s; padding: 5px 0; text-transform: uppercase;
-            white-space: nowrap; /* 改行を防ぐ */
+            white-space: nowrap;
         }
         .side-btn:hover { opacity: 0.5; transform: translateX(-10px); }
 
-        /* --- Overlay Pages --- */
         .page-overlay {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
             background: var(--white); z-index: 800; display: none;
             padding: 100px 40px; box-sizing: border-box; overflow-y: auto;
         }
         .page-overlay.active { display: flex; justify-content: center; align-items: flex-start; animation: fadeIn 0.4s ease-out; }
-        
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
         .content-inner { max-width: 800px; width: 100%; color: var(--black); padding-top: 60px; padding-bottom: 100px; }
-        
-        .profile-image-container {
-            width: 300px; margin: 0 auto 40px auto; border: 2px solid var(--black); background: #f9f9f9;
-        }
+        .profile-image-container { width: 300px; margin: 0 auto 40px auto; border: 2px solid var(--black); background: #f9f9f9; }
         .profile-image { width: 100%; height: auto; display: block; }
 
         h1 { font-size: clamp(48px, 10vw, 80px); font-weight: 900; margin-bottom: 40px; letter-spacing: -2px; line-height: 0.9; text-align: center; }
         .bio { font-size: 18px; line-height: 2; font-weight: 500; margin-bottom: 60px; }
-        
         .link-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 20px; border-top: 2px solid var(--black); padding-top: 40px; }
         .ext-link { font-size: 16px; font-weight: 900; color: var(--black); text-decoration: none; text-transform: uppercase; letter-spacing: 2px; }
         .ext-link:hover { opacity: 0.4; }
 
         .status { position: fixed; bottom: 20px; left: 20px; font-family: monospace; font-size: 10px; opacity: 0.3; pointer-events: none; }
 
-        /* ★スマホ表示（レスポンシブ）の修正エリア★ */
         @media (max-width: 768px) {
             #ui-header { top: 20px; left: 20px; }
             .logo { font-size: 18px; padding: 5px 12px; }
-
             #nav-container { right: 20px; gap: 15px; }
             .side-btn { font-size: 16px; letter-spacing: 1px; }
-
             .page-overlay { padding: 80px 20px; }
-            .content-inner { padding-top: 20px; }
             .profile-image-container { width: 180px; }
-            
             h1 { font-size: 40px; }
-            .bio { font-size: 15px; line-height: 1.8; }
-            .link-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
-            .ext-link { font-size: 14px; }
+            .bio { font-size: 15px; }
         }
     </style>
 </head>
@@ -106,16 +90,15 @@
             <div class="profile-image-container">
                 <img src="profile.png" alt="wayatani profile" class="profile-image">
             </div>
-
             <h1>PROFILE</h1>
             <div class="bio">
                 <p>アニメーションアーティスト。</p>
-                <p>CGで作成したオリジナルキャラクターとリミナルスペースを組み合わせた、現実と仮想の境界を横断する映像表現を得意とする。</p>
+                <p>CGで作成したオリジナルキャラクターとリミナルな情景を組み合わせた、現実と仮想の境界を横断する映像表現を得意とする。</p>
                 <p>また、映像を「映す」という行為そのものに立ち返り、物理的・技術的なプロセスを表現の一部として取り込むことを意識した映像デバイスの製作も行なう。</p>
             </div>
             <div class="link-grid">
-                <a href="https://www.instagram.com/wayatani_art" target="_blank" class="ext-link">Instagram</a>
-                <a href="https://x.com/wayatani_art" target="_blank" class="ext-link">X (Twitter)</a>
+                <a href="https://www.instagram.com/wayatani_" target="_blank" class="ext-link">Instagram</a>
+                <a href="https://x.com/wayatani_" target="_blank" class="ext-link">X (Twitter)</a>
             </div>
         </div>
     </div>
@@ -124,7 +107,7 @@
     <div id="page-shop" class="page-overlay"><div class="content-inner"><h1>SHOP</h1><p class="bio">準備中...</p></div></div>
     <div id="page-contact" class="page-overlay"><div class="content-inner"><h1>CONTACT</h1><p class="bio">Mail: your-email@example.com</p></div></div>
 
-    <div class="status">System_State: Responsive_Enabled // User: Wayatani // Mode: INFINITE_MAZE</div>
+    <div class="status">System_State: Integrated // Mode: INFINITE_MAZE</div>
 
     <script type="module">
         import * as THREE from 'three';
@@ -139,7 +122,7 @@
             }
         }
 
-        let scene, camera, renderer;
+        let scene, camera, renderer, clock;
         let segments = [];
         let isDragging = false;
         let targetRotX = 0, targetRotY = 0;
@@ -157,7 +140,10 @@
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
+            clock = new THREE.Clock();
+
             for (let i = 0; i < 40; i++) spawnSegment();
+
             window.addEventListener('mousedown', (e) => { 
                 if (e.target.closest('#nav-container') || e.target.closest('#ui-header') || e.target.closest('.page-overlay')) return;
                 isDragging = true; previousMouseX = e.clientX; previousMouseY = e.clientY; 
@@ -166,7 +152,6 @@
                 if (!isDragging) return;
                 targetRotY -= (e.clientX - previousMouseX) * 0.005;
                 targetRotX -= (e.clientY - previousMouseY) * 0.005;
-                targetRotX = Math.max(-0.6, Math.min(0.6, targetRotX));
                 previousMouseX = e.clientX; previousMouseY = e.clientY;
             });
             window.addEventListener('mouseup', () => isDragging = false);
@@ -208,18 +193,30 @@
 
         function animate() {
             requestAnimationFrame(animate);
+            const time = clock.getElapsedTime();
+
             if (pathPoints.length > 5) {
                 const nextTarget = pathPoints[1];
                 const moveVec = new THREE.Vector3().subVectors(nextTarget, camera.position);
                 if (moveVec.length() > 1) {
                     camera.position.add(moveVec.normalize().multiplyScalar(0.8));
-                    camera.lookAt(pathPoints[2] || nextTarget);
+                    // 以前の予測不能な「揺れ」を再現
+                    const wobble = Math.sin(time * 0.5) * 2;
+                    camera.lookAt(pathPoints[2].x + wobble, pathPoints[2].y + wobble, pathPoints[2].z);
                 } else {
                     pathPoints.shift(); spawnSegment();
                 }
             }
-            camera.rotation.x += targetRotX; camera.rotation.y += targetRotY;
-            if (!isDragging) { targetRotX *= 0.95; targetRotY *= 0.95; }
+
+            // 回転の慣性を強くし、予測不能なフラフラ感を出す
+            camera.rotation.x += targetRotX + Math.sin(time * 0.2) * 0.001; 
+            camera.rotation.y += targetRotY + Math.cos(time * 0.2) * 0.001;
+
+            if (!isDragging) {
+                targetRotX *= 0.98; // 減衰を遅くして余韻を長く
+                targetRotY *= 0.98;
+            }
+            
             renderer.render(scene, camera);
         }
 
