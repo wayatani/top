@@ -127,3 +127,117 @@
     <div id="page-shop" class="page-overlay">
         <div class="content-inner"><h1>SHOP</h1><p class="bio">準備中...</p></div>
     </div>
+    <div id="page-contact" class="page-overlay">
+        <div class="content-inner">
+            <h1>CONTACT</h1>
+            <p class="bio">お問い合わせはメールまたはSNSにて。</p>
+            <a href="mailto:your-email@example.com" class="ext-link" style="font-size: 24px;">your-email@example.com</a>
+        </div>
+    </div>
+
+    <div class="status">System_State: Integrated // Mode: INFINITE_MAZE</div>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        window.showPage = function(pageId) {
+            document.querySelectorAll('.page-overlay').forEach(el => el.classList.remove('active'));
+            if(pageId !== 'maze') {
+                document.getElementById('page-' + pageId).classList.add('active');
+                document.body.style.cursor = 'default';
+            } else {
+                document.body.style.cursor = 'grab';
+            }
+        }
+
+        // --- Maze Logic ---
+        let scene, camera, renderer;
+        let segments = [];
+        let isDragging = false;
+        let targetRotX = 0, targetRotY = 0;
+        let previousMouseX = 0, previousMouseY = 0;
+        const UNIT = 40; 
+        let currentPos = new THREE.Vector3(0, 0, 0);
+        let currentDir = new THREE.Vector3(0, 0, -1);
+        let pathPoints = [];
+
+        init();
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xffffff);
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            for (let i = 0; i < 40; i++) spawnSegment();
+
+            window.addEventListener('mousedown', (e) => { 
+                if (e.target.closest('#nav-container') || e.target.closest('#ui-header') || e.target.closest('.page-overlay')) return;
+                isDragging = true; previousMouseX = e.clientX; previousMouseY = e.clientY; 
+            });
+            window.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                targetRotY -= (e.clientX - previousMouseX) * 0.005;
+                targetRotX -= (e.clientY - previousMouseY) * 0.005;
+                targetRotX = Math.max(-0.6, Math.min(0.6, targetRotX));
+                previousMouseX = e.clientX; previousMouseY = e.clientY;
+            });
+            window.addEventListener('mouseup', () => isDragging = false);
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+            animate();
+        }
+
+        function spawnSegment() {
+            const group = new THREE.Group();
+            const material = new THREE.LineBasicMaterial({ color: 0x000000 });
+            const s = UNIT / 2;
+            const pts = [[-s,-s,0], [s,-s,0], [s,s,0], [-s,s,0], [-s,-s,0], [-s,-s,-UNIT], [s,-s,-UNIT], [s,s,-UNIT], [-s,s,-UNIT], [-s,-s,-UNIT], null, [s,-s,0], [s,-s,-UNIT], null, [s,s,0], [s,s,-UNIT], null, [-s,s,0], [-s,s,-UNIT]];
+            let temp = [];
+            pts.forEach(p => {
+                if (p === null) { draw(temp, group, material); temp = []; }
+                else temp.push(new THREE.Vector3(...p));
+            });
+            draw(temp, group, material);
+            group.position.copy(currentPos);
+            group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), currentDir);
+            scene.add(group);
+            segments.push(group);
+            pathPoints.push(currentPos.clone());
+            currentPos.add(currentDir.clone().multiplyScalar(UNIT));
+            if (Math.random() < 0.25) {
+                const turn = Math.random() > 0.5 ? Math.PI/2 : -Math.PI/2;
+                currentDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), turn).round();
+            }
+        }
+
+        function draw(pts, group, mat) {
+            if (pts.length < 2) return;
+            group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat));
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (pathPoints.length > 5) {
+                const nextTarget = pathPoints[1];
+                const moveVec = new THREE.Vector3().subVectors(nextTarget, camera.position);
+                if (moveVec.length() > 1) {
+                    camera.position.add(moveVec.normalize().multiplyScalar(0.8));
+                    camera.lookAt(pathPoints[2] || nextTarget);
+                } else {
+                    pathPoints.shift(); spawnSegment();
+                }
+            }
+            camera.rotation.x += targetRotX; camera.rotation.y += targetRotY;
+            if (!isDragging) { targetRotX *= 0.95; targetRotY *= 0.95; }
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
