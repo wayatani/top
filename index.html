@@ -1,14 +1,15 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>わやたに | Infinite Maze / Navigation</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>わやたに | Infinite Maze & Profile</title>
     <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
-            }
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
         }
+    }
     </script>
     <style>
         :root {
@@ -17,115 +18,132 @@
             --white: #ffffff;
         }
 
-        body {
-            margin: 0;
-            background: var(--white);
-            overflow: hidden;
-            font-family: var(--ui-font);
-            cursor: grab;
+        body { margin: 0; background: var(--white); overflow: hidden; font-family: var(--ui-font); cursor: grab; }
+        body:active { cursor: grabbing; }
+
+        /* --- UI Elements --- */
+        #ui-header { position: fixed; top: 40px; left: 40px; z-index: 1000; }
+        .logo { 
+            font-size: 24px; font-weight: 900; border: 3px solid var(--black); 
+            padding: 8px 20px; background: var(--white); display: inline-block; 
+            cursor: pointer; letter-spacing: -1px; text-decoration: none; color: var(--black);
         }
 
-            body:active {
-                cursor: grabbing;
-            }
-
-        /* ロゴ */
-        #ui-header {
-            position: fixed;
-            top: 40px;
-            left: 40px;
-            z-index: 100;
-            pointer-events: none;
-        }
-
-        .logo {
-            font-size: 24px;
-            font-weight: 900;
-            border: 2px solid var(--black);
-            padding: 5px 15px;
-            background: var(--white);
-            display: inline-block;
-            pointer-events: auto;
-            letter-spacing: -1px;
-        }
-
-        /* 右側ナビゲーションコンテナ */
         #nav-container {
-            position: fixed;
-            right: 40px;
-            top: 50%;
-            transform: translateY(-50%);
-            z-index: 200;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            text-align: right;
-            pointer-events: none;
+            position: fixed; right: 40px; top: 50%; transform: translateY(-50%);
+            z-index: 1000; display: flex; flex-direction: column; gap: 20px; text-align: right;
         }
-
-        /* リンクスタイル */
-        .side-link {
-            pointer-events: auto;
-            text-decoration: none;
-            color: var(--black);
-            font-weight: 900;
-            font-size: 24px;
-            letter-spacing: 2px;
-            transition: opacity 0.2s, transform 0.2s;
-            display: block;
+        .side-btn {
+            background: none; border: none; cursor: pointer;
+            color: var(--black); font-weight: 900; font-size: 24px;
+            letter-spacing: 2px; transition: 0.2s; padding: 0; text-transform: uppercase;
         }
+        .side-btn:hover { opacity: 0.5; transform: translateX(-10px); }
 
-            .side-link:hover {
-                opacity: 0.5;
-                transform: translateX(-10px);
-            }
-
-        .status {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            font-family: monospace;
-            font-size: 9px;
-            opacity: 0.3;
-            pointer-events: none;
-            text-transform: uppercase;
+        /* --- Overlay Pages --- */
+        .page-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: var(--white); z-index: 800; display: none;
+            padding: 100px 40px; box-sizing: border-box; overflow-y: auto;
         }
+        .page-overlay.active { display: flex; justify-content: center; align-items: center; animation: fadeIn 0.4s ease-out; }
+        
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        @media (max-width: 768px) {
-            .side-link {
-                font-size: 18px;
-            }
+        .content-inner { max-width: 800px; width: 100%; color: var(--black); }
+        h1 { font-size: clamp(48px, 10vw, 80px); font-weight: 900; margin-bottom: 40px; letter-spacing: -2px; line-height: 0.9; }
+        .bio { font-size: 18px; line-height: 2; font-weight: 500; margin-bottom: 60px; }
+        
+        .link-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 20px; border-top: 2px solid var(--black); padding-top: 40px; }
+        .ext-link { font-size: 16px; font-weight: 900; color: var(--black); text-decoration: none; text-transform: uppercase; letter-spacing: 2px; }
+        .ext-link:hover { opacity: 0.4; }
 
-            #nav-container {
-                right: 20px;
-            }
+        .status { position: fixed; bottom: 20px; left: 20px; font-family: monospace; font-size: 10px; opacity: 0.3; pointer-events: none; }
+
+        @media (max-width: 600px) {
+            #ui-header { top: 20px; left: 20px; }
+            #nav-container { right: 20px; }
+            .side-btn { font-size: 18px; }
         }
     </style>
 </head>
 <body>
 
     <div id="ui-header">
-        <h1 class="logo">わやたに</h1>
+        <div class="logo" onclick="showPage('maze')">わやたに</div>
     </div>
 
     <nav id="nav-container">
-        <a href="https://your-profile-page-url.com" target="_blank" class="side-link">PROFILE</a>
-        <a href="https://your-works-page-url.com" target="_blank" class="side-link">WORKS</a>
-        <a href="https://your-shop-page-url.com" target="_blank" class="side-link">SHOP</a>
-        <a href="mailto:your-email@example.com" target="_blank" class="side-link">CONTACT</a>
+        <button class="side-btn" onclick="showPage('profile')">PROFILE</button>
+        <button class="side-btn" onclick="showPage('works')">WORKS</button>
+        <button class="side-btn" onclick="showPage('shop')">SHOP</button>
+        <button class="side-btn" onclick="showPage('contact')">CONTACT</button>
     </nav>
 
-    <div class="status">MAZE_ENGINE: RECOVERED // STATUS: INFINITE_DRAWING</div>
+    <div id="page-profile" class="page-overlay">
+        <div class="content-inner">
+            <h1>PROFILE</h1>
+            <div class="bio">
+                <p>アニメーションアーティスト。</p>
+                <p>
+                    CGで作成したオリジナルキャラクターとリミナルな情景を組み合わせた、現実と仮想の境界を横断する映像表現を得意とする。
+                </p>
+                <p>
+                    日常の中に潜むリミナルな感覚を映像として再構築することで、「存在」の揺らぎを提示している。
+                </p>
+                <p>
+                    また、映像を「映す」という行為そのものに立ち返り、物理的・技術的なプロセスを表現の一部として取り込むことを意識した、映像デバイスの製作も行なう。
+                </p>
+            </div>
+            <div class="link-grid">
+                <a href="https://instagram.com/your-id" target="_blank" class="ext-link">Instagram</a>
+                <a href="https://twitter.com/your-id" target="_blank" class="ext-link">X (Twitter)</a>
+            </div>
+        </div>
+    </div>
 
-    <script type="module">import * as THREE from 'three';
+    <div id="page-works" class="page-overlay">
+        <div class="content-inner"><h1>WORKS</h1><p class="bio">Coming Soon...</p></div>
+    </div>
+    <div id="page-shop" class="page-overlay">
+        <div class="content-inner"><h1>SHOP</h1><p class="bio">準備中...</p></div>
+    </div>
+    <div id="page-contact" class="page-overlay">
+        <div class="content-inner">
+            <h1>CONTACT</h1>
+            <p class="bio">お仕事のご依頼やお問い合わせはこちらまで。</p>
+            <a href="mailto:your-email@example.com" class="ext-link" style="font-size: 24px;">your-email@example.com</a>
+        </div>
+    </div>
 
+    <div class="status">System_State: Seamless_Integrated // Mode: INFINITE_MAZE</div>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // --- UI Switching Logic ---
+        window.showPage = function(pageId) {
+            document.querySelectorAll('.page-overlay').forEach(el => el.classList.remove('active'));
+            const statusText = document.querySelector('.status');
+            
+            if(pageId !== 'maze') {
+                document.getElementById('page-' + pageId).classList.add('active');
+                document.body.style.cursor = 'default';
+                statusText.innerText = "System_State: Static_View // Mode: " + pageId.toUpperCase();
+            } else {
+                document.body.style.cursor = 'grab';
+                statusText.innerText = "System_State: Seamless_Integrated // Mode: INFINITE_MAZE";
+            }
+        }
+
+        // --- Three.js Maze Logic ---
         let scene, camera, renderer, clock;
         let segments = [];
         let isDragging = false;
         let targetRotX = 0, targetRotY = 0;
         let previousMouseX = 0, previousMouseY = 0;
 
-        const UNIT = 40;
+        const UNIT = 40; 
         let currentPos = new THREE.Vector3(0, 0, 0);
         let currentDir = new THREE.Vector3(0, 0, -1);
         let pathPoints = [];
@@ -144,14 +162,11 @@
             document.body.appendChild(renderer.domElement);
 
             clock = new THREE.Clock();
-
-            // 迷路の初期生成
             for (let i = 0; i < 40; i++) spawnSegment();
 
-            // ドラッグ操作系
-            window.addEventListener('mousedown', (e) => {
-                if (e.target.tagName === 'A') return;
-                isDragging = true; previousMouseX = e.clientX; previousMouseY = e.clientY;
+            window.addEventListener('mousedown', (e) => { 
+                if (e.target.closest('#nav-container') || e.target.closest('#ui-header') || e.target.closest('.page-overlay')) return;
+                isDragging = true; previousMouseX = e.clientX; previousMouseY = e.clientY; 
             });
             window.addEventListener('mousemove', (e) => {
                 if (!isDragging) return;
@@ -170,29 +185,21 @@
             const group = new THREE.Group();
             const material = new THREE.LineBasicMaterial({ color: 0x000000 });
             const s = UNIT / 2;
-
-            const pts = [
-                [-s, -s, 0], [s, -s, 0], [s, s, 0], [-s, s, 0], [-s, -s, 0],
-                [-s, -s, -UNIT], [s, -s, -UNIT], [s, s, -UNIT], [-s, s, -UNIT], [-s, -s, -UNIT],
-                null, [s, -s, 0], [s, -s, -UNIT], null, [s, s, 0], [s, s, -UNIT], null, [-s, s, 0], [-s, s, -UNIT]
-            ];
-
+            const pts = [[-s,-s,0], [s,-s,0], [s,s,0], [-s,s,0], [-s,-s,0], [-s,-s,-UNIT], [s,-s,-UNIT], [s,s,-UNIT], [-s,s,-UNIT], [-s,-s,-UNIT], null, [s,-s,0], [s,-s,-UNIT], null, [s,s,0], [s,s,-UNIT], null, [-s,s,0], [-s,s,-UNIT]];
             let temp = [];
             pts.forEach(p => {
                 if (p === null) { draw(temp, group, material); temp = []; }
                 else temp.push(new THREE.Vector3(...p));
             });
             draw(temp, group, material);
-
             group.position.copy(currentPos);
             group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), currentDir);
             scene.add(group);
             segments.push(group);
             pathPoints.push(currentPos.clone());
-
             currentPos.add(currentDir.clone().multiplyScalar(UNIT));
             if (Math.random() < 0.25) {
-                const turn = Math.random() > 0.5 ? Math.PI / 2 : -Math.PI / 2;
+                const turn = Math.random() > 0.5 ? Math.PI/2 : -Math.PI/2;
                 currentDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), turn).round();
             }
         }
@@ -205,9 +212,7 @@
 
         function animate() {
             requestAnimationFrame(animate);
-            const time = clock.getElapsedTime();
             const speed = 0.8;
-
             if (pathPoints.length > 5) {
                 const nextTarget = pathPoints[1];
                 const moveVec = new THREE.Vector3().subVectors(nextTarget, camera.position);
@@ -219,7 +224,6 @@
                     pathPoints.shift(); spawnSegment();
                 }
             }
-
             segments.forEach((seg, idx) => {
                 const wobble = 0.005;
                 seg.rotation.x += (Math.random() - 0.5) * wobble;
@@ -228,11 +232,8 @@
                     scene.remove(seg); segments.splice(idx, 1);
                 }
             });
-
-            camera.rotation.x += targetRotX;
-            camera.rotation.y += targetRotY;
+            camera.rotation.x += targetRotX; camera.rotation.y += targetRotY;
             if (!isDragging) { targetRotX *= 0.95; targetRotY *= 0.95; }
-
             renderer.render(scene, camera);
         }
 
@@ -240,9 +241,7 @@
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-        }</script>
-    <div class="header">
-    <a href="https://wayatani.github.io/top/" target="_blank" class="logo" style="text-decoration: none; color: inherit;">わやたに</a>
-</div>
+        }
+    </script>
 </body>
 </html>
