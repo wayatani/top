@@ -52,18 +52,10 @@
 
         .content-inner { max-width: 800px; width: 100%; color: var(--black); padding-top: 60px; padding-bottom: 100px; }
         
-        /* 画像エリア */
         .profile-image-container {
-            width: 100%;
-            margin-bottom: 40px;
-            border: 2px solid var(--black);
-            background: #f9f9f9;
+            width: 100%; margin-bottom: 40px; border: 2px solid var(--black); background: #f9f9f9;
         }
-        .profile-image {
-            width: 100%;
-            height: auto;
-            display: block;
-        }
+        .profile-image { width: 100%; height: auto; display: block; }
 
         h1 { font-size: clamp(48px, 10vw, 80px); font-weight: 900; margin-bottom: 40px; letter-spacing: -2px; line-height: 0.9; }
         .bio { font-size: 18px; line-height: 2; font-weight: 500; margin-bottom: 60px; }
@@ -104,15 +96,9 @@
             <h1>PROFILE</h1>
             <div class="bio">
                 <p>アニメーションアーティスト。</p>
-                <p>
-                    CGで作成したオリジナルキャラクターとリミナルな情景を組み合わせた、現実と仮想の境界を横断する映像表現が得意とする。
-                </p>
-                <p>
-                    日常の中に潜むリミナルな感覚を映像として再構築することで、「存在」の揺らぎを提示している。
-                </p>
-                <p>
-                    また、映像を「映す」という行為そのものに立ち返り、物理的・技術的なプロセスを表現の一部として取り込むことを意識した、映像デバイスの製作も行なう。
-                </p>
+                <p>CGで作成したオリジナルキャラクターとリミナルな情景を組み合わせた、現実と仮想の境界を横断する映像表現を得意とする。</p>
+                <p>日常の中に潜むリミナルな感覚を映像として再構築することで、「存在」の揺らぎを提示している。</p>
+                <p>また、映像を「映す」という行為そのものに立ち返り、物理的・技術的なプロセスを表現の一部として取り込むことを意識した、映像デバイスの製作も行なう。</p>
             </div>
             <div class="link-grid">
                 <a href="https://www.instagram.com/wayatani_" target="_blank" class="ext-link">Instagram</a>
@@ -121,19 +107,9 @@
         </div>
     </div>
 
-    <div id="page-works" class="page-overlay">
-        <div class="content-inner"><h1>WORKS</h1><p class="bio">Coming Soon...</p></div>
-    </div>
-    <div id="page-shop" class="page-overlay">
-        <div class="content-inner"><h1>SHOP</h1><p class="bio">準備中...</p></div>
-    </div>
-    <div id="page-contact" class="page-overlay">
-        <div class="content-inner">
-            <h1>CONTACT</h1>
-            <p class="bio">お問い合わせはメールまたはSNSにて。</p>
-            <a href="mailto:your-email@example.com" class="ext-link" style="font-size: 24px;">your-email@example.com</a>
-        </div>
-    </div>
+    <div id="page-works" class="page-overlay"><div class="content-inner"><h1>WORKS</h1><p class="bio">Coming Soon...</p></div></div>
+    <div id="page-shop" class="page-overlay"><div class="content-inner"><h1>SHOP</h1><p class="bio">準備中...</p></div></div>
+    <div id="page-contact" class="page-overlay"><div class="content-inner"><h1>CONTACT</h1><p class="bio">Mail: your-email@example.com</p></div></div>
 
     <div class="status">System_State: Integrated // Mode: INFINITE_MAZE</div>
 
@@ -150,7 +126,6 @@
             }
         }
 
-        // --- Maze Logic ---
         let scene, camera, renderer;
         let segments = [];
         let isDragging = false;
@@ -161,12 +136,11 @@
         let currentDir = new THREE.Vector3(0, 0, -1);
         let pathPoints = [];
 
-        init();
-
         function init() {
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0xffffff);
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+            
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -238,6 +212,8 @@
             if (!isDragging) { targetRotX *= 0.95; targetRotY *= 0.95; }
             renderer.render(scene, camera);
         }
+
+        init();
     </script>
 </body>
 </html>
