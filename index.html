@@ -52,12 +52,20 @@
 
         .content-inner { max-width: 800px; width: 100%; color: var(--black); padding-top: 60px; padding-bottom: 100px; }
         
+        /* ★画像サイズ調整エリア★ */
         .profile-image-container {
-            width: 100%; margin-bottom: 40px; border: 2px solid var(--black); background: #f9f9f9;
+            width: 300px; /* 横幅を300pxに固定 */
+            margin: 0 auto 40px auto; /* 中央寄せにして下に余白 */
+            border: 2px solid var(--black);
+            background: #f9f9f9;
         }
-        .profile-image { width: 100%; height: auto; display: block; }
+        .profile-image {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
 
-        h1 { font-size: clamp(48px, 10vw, 80px); font-weight: 900; margin-bottom: 40px; letter-spacing: -2px; line-height: 0.9; }
+        h1 { font-size: clamp(48px, 10vw, 80px); font-weight: 900; margin-bottom: 40px; letter-spacing: -2px; line-height: 0.9; text-align: center; }
         .bio { font-size: 18px; line-height: 2; font-weight: 500; margin-bottom: 60px; }
         
         .link-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 20px; border-top: 2px solid var(--black); padding-top: 40px; }
@@ -71,6 +79,7 @@
             #nav-container { right: 20px; }
             .side-btn { font-size: 18px; }
             .content-inner { padding-top: 20px; }
+            .profile-image-container { width: 200px; } /* スマホではさらに小さく */
         }
     </style>
 </head>
@@ -126,6 +135,7 @@
             }
         }
 
+        // --- Maze Logic ---
         let scene, camera, renderer;
         let segments = [];
         let isDragging = false;
@@ -140,14 +150,11 @@
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0xffffff);
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
-            
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
-
             for (let i = 0; i < 40; i++) spawnSegment();
-
             window.addEventListener('mousedown', (e) => { 
                 if (e.target.closest('#nav-container') || e.target.closest('#ui-header') || e.target.closest('.page-overlay')) return;
                 isDragging = true; previousMouseX = e.clientX; previousMouseY = e.clientY; 
