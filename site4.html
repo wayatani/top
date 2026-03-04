@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
@@ -6,7 +6,8 @@
     <script type="importmap">
         {
             "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
             }
         }
     </script>
@@ -16,90 +17,14 @@
             --black: #000000;
             --white: #ffffff;
         }
-
-        body {
-            margin: 0;
-            background: var(--white);
-            overflow: hidden;
-            font-family: var(--ui-font);
-            cursor: grab;
-        }
-
-            body:active {
-                cursor: grabbing;
-            }
-
-        /* ロゴ */
-        #ui-header {
-            position: fixed;
-            top: 40px;
-            left: 40px;
-            z-index: 100;
-            pointer-events: none;
-        }
-
-        .logo {
-            font-size: 24px;
-            font-weight: 900;
-            border: 2px solid var(--black);
-            padding: 5px 15px;
-            background: var(--white);
-            display: inline-block;
-            pointer-events: auto;
-            letter-spacing: -1px;
-        }
-
-        /* 右側ナビゲーションコンテナ */
-        #nav-container {
-            position: fixed;
-            right: 40px;
-            top: 50%;
-            transform: translateY(-50%);
-            z-index: 200;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            text-align: right;
-            pointer-events: none;
-        }
-
-        /* リンクスタイル */
-        .side-link {
-            pointer-events: auto;
-            text-decoration: none;
-            color: var(--black);
-            font-weight: 900;
-            font-size: 24px;
-            letter-spacing: 2px;
-            transition: opacity 0.2s, transform 0.2s;
-            display: block;
-        }
-
-            .side-link:hover {
-                opacity: 0.5;
-                transform: translateX(-10px);
-            }
-
-        .status {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            font-family: monospace;
-            font-size: 9px;
-            opacity: 0.3;
-            pointer-events: none;
-            text-transform: uppercase;
-        }
-
-        @media (max-width: 768px) {
-            .side-link {
-                font-size: 18px;
-            }
-
-            #nav-container {
-                right: 20px;
-            }
-        }
+        body { margin: 0; background: var(--white); overflow: hidden; font-family: var(--ui-font); cursor: grab; }
+        body:active { cursor: grabbing; }
+        #ui-header { position: fixed; top: 40px; left: 40px; z-index: 100; pointer-events: none; }
+        .logo { font-size: 24px; font-weight: 900; border: 2px solid var(--black); padding: 5px 15px; background: var(--white); display: inline-block; pointer-events: auto; letter-spacing: -1px; }
+        #nav-container { position: fixed; right: 40px; top: 50%; transform: translateY(-50%); z-index: 200; display: flex; flex-direction: column; gap: 20px; text-align: right; pointer-events: none; }
+        .side-link { pointer-events: auto; text-decoration: none; color: var(--black); font-weight: 900; font-size: 24px; letter-spacing: 2px; transition: opacity 0.2s, transform 0.2s; display: block; }
+        .side-link:hover { opacity: 0.5; transform: translateX(-10px); }
+        .status { position: fixed; bottom: 20px; left: 20px; font-family: monospace; font-size: 9px; opacity: 0.3; pointer-events: none; text-transform: uppercase; }
     </style>
 </head>
 <body>
@@ -109,15 +34,17 @@
     </div>
 
     <nav id="nav-container">
-        <a href="https://your-profile-page-url.com" target="_blank" class="side-link">PROFILE</a>
-        <a href="https://your-works-page-url.com" target="_blank" class="side-link">WORKS</a>
-        <a href="https://your-shop-page-url.com" target="_blank" class="side-link">SHOP</a>
-        <a href="mailto:your-email@example.com" target="_blank" class="side-link">CONTACT</a>
+        <a href="#" class="side-link">PROFILE</a>
+        <a href="#" class="side-link">WORKS</a>
+        <a href="#" class="side-link">SHOP</a>
+        <a href="#" class="side-link">CONTACT</a>
     </nav>
 
-    <div class="status">MAZE_ENGINE: RECOVERED // STATUS: INFINITE_DRAWING</div>
+    <div class="status">MAZE_ENGINE: RECOVERED // STATUS: ENTITY_DETECTED</div>
 
-    <script type="module">import * as THREE from 'three';
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
         let scene, camera, renderer, clock;
         let segments = [];
@@ -130,11 +57,16 @@
         let currentDir = new THREE.Vector3(0, 0, -1);
         let pathPoints = [];
 
+        // キャラクター設定
+        let character = null;
+        const loader = new GLTFLoader();
+
         init();
 
         function init() {
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0xffffff);
+            
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
             camera.position.set(0, 0, 0);
 
@@ -145,10 +77,22 @@
 
             clock = new THREE.Clock();
 
-            // 迷路の初期生成
+            // 環境光
+            scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+            const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+            sun.position.set(50, 50, 50);
+            scene.add(sun);
+
+            // GLB読み込み（GitHub上の相対パスを指定）
+            // char.glb という名前で同じ階層に置いている想定です
+            loader.load('char.glb', (gltf) => {
+                character = gltf.scene;
+                character.scale.set(6, 6, 6); 
+                scene.add(character);
+            });
+
             for (let i = 0; i < 40; i++) spawnSegment();
 
-            // ドラッグ操作系
             window.addEventListener('mousedown', (e) => {
                 if (e.target.tagName === 'A') return;
                 isDragging = true; previousMouseX = e.clientX; previousMouseY = e.clientY;
@@ -161,7 +105,11 @@
                 previousMouseX = e.clientX; previousMouseY = e.clientY;
             });
             window.addEventListener('mouseup', () => isDragging = false);
-            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
 
             animate();
         }
@@ -170,13 +118,11 @@
             const group = new THREE.Group();
             const material = new THREE.LineBasicMaterial({ color: 0x000000 });
             const s = UNIT / 2;
-
             const pts = [
                 [-s, -s, 0], [s, -s, 0], [s, s, 0], [-s, s, 0], [-s, -s, 0],
                 [-s, -s, -UNIT], [s, -s, -UNIT], [s, s, -UNIT], [-s, s, -UNIT], [-s, -s, -UNIT],
                 null, [s, -s, 0], [s, -s, -UNIT], null, [s, s, 0], [s, s, -UNIT], null, [-s, s, 0], [-s, s, -UNIT]
             ];
-
             let temp = [];
             pts.forEach(p => {
                 if (p === null) { draw(temp, group, material); temp = []; }
@@ -189,7 +135,6 @@
             scene.add(group);
             segments.push(group);
             pathPoints.push(currentPos.clone());
-
             currentPos.add(currentDir.clone().multiplyScalar(UNIT));
             if (Math.random() < 0.25) {
                 const turn = Math.random() > 0.5 ? Math.PI / 2 : -Math.PI / 2;
@@ -206,13 +151,13 @@
         function animate() {
             requestAnimationFrame(animate);
             const time = clock.getElapsedTime();
-            const speed = 0.8;
 
+            // カメラの前進
             if (pathPoints.length > 5) {
                 const nextTarget = pathPoints[1];
                 const moveVec = new THREE.Vector3().subVectors(nextTarget, camera.position);
                 if (moveVec.length() > 1) {
-                    moveVec.normalize().multiplyScalar(speed);
+                    moveVec.normalize().multiplyScalar(0.8);
                     camera.position.add(moveVec);
                     camera.lookAt(pathPoints[2] || nextTarget);
                 } else {
@@ -220,10 +165,41 @@
                 }
             }
 
+            // キャラクター：壁貫通＆不規則バウンド
+            if (character) {
+                const t = time * 0.6;
+                // カメラの周囲を大きく旋回（壁を突き抜ける）
+                const orbitRadius = 70 + Math.sin(t * 0.5) * 30;
+                const targetX = camera.position.x + Math.sin(t) * orbitRadius;
+                const targetZ = camera.position.z + Math.cos(t) * orbitRadius;
+                
+                // 跳ねる動き
+                const jumpFreq = 4;
+                const bounce = Math.abs(Math.sin(time * jumpFreq)) * 15;
+                const float = Math.sin(t * 2) * 8;
+                const targetY = (bounce + float) - 5;
+
+                // グリッチテレポート
+                if (Math.random() > 0.992) {
+                    character.position.x += (Math.random() - 0.5) * 150;
+                    character.position.z += (Math.random() - 0.5) * 150;
+                    document.querySelector('.status').innerText = "ERROR: ENTITY_GLITCH // RE-INDEXING...";
+                    setTimeout(() => {
+                        document.querySelector('.status').innerText = "MAZE_ENGINE: RECOVERED // STATUS: ENTITY_DETECTED";
+                    }, 400);
+                } else {
+                    character.position.lerp(new THREE.Vector3(targetX, targetY, targetZ), 0.04);
+                }
+
+                // カメラを凝視し、着地時に潰れる
+                character.lookAt(camera.position);
+                const squash = 1.0 - Math.max(0, Math.cos(time * jumpFreq * 2)) * 0.25;
+                character.scale.set(6, 6 * squash, 6);
+            }
+
             segments.forEach((seg, idx) => {
-                const wobble = 0.005;
-                seg.rotation.x += (Math.random() - 0.5) * wobble;
-                seg.rotation.y += (Math.random() - 0.5) * wobble;
+                seg.rotation.x += (Math.random() - 0.5) * 0.005;
+                seg.rotation.y += (Math.random() - 0.5) * 0.005;
                 if (camera.position.distanceTo(seg.position) > 1200) {
                     scene.remove(seg); segments.splice(idx, 1);
                 }
@@ -235,8 +211,6 @@
 
             renderer.render(scene, camera);
         }
-
-
-        }</script>
+    </script>
 </body>
 </html>
