@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>わやたに | Infinite Maze / Navigation</title>
+    <title>わやたに | Wobbly Infinite Maze</title>
     <script type="importmap">
         {
             "imports": {
@@ -40,7 +40,7 @@
         <a href="#" class="side-link">CONTACT</a>
     </nav>
 
-    <div class="status">MAZE_ENGINE: RECOVERED // STATUS: ENTITY_DETECTED</div>
+    <div class="status">MAZE_ENGINE: HIGH_WOBBLE_MODE // STATUS: STABILIZING_PATH</div>
 
     <script type="module">
         import * as THREE from 'three';
@@ -66,7 +66,8 @@
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0xffffff);
             
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+            // 視野角を少し広げて没入感をアップ
+            camera = new THREE.PerspectiveCamera(85, window.innerWidth / window.innerHeight, 0.1, 2000);
             camera.position.set(0, 0, 0);
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -76,18 +77,20 @@
 
             clock = new THREE.Clock();
 
-            scene.add(new THREE.AmbientLight(0xffffff, 1.2));
-            const sun = new THREE.DirectionalLight(0xffffff, 0.8);
-            sun.position.set(50, 50, 50);
+            scene.add(new THREE.AmbientLight(0xffffff, 1.5));
+            const sun = new THREE.DirectionalLight(0xffffff, 1.0);
+            sun.position.set(50, 80, 50);
             scene.add(sun);
 
+            // キャラクター読み込み
             loader.load('char.glb', (gltf) => {
                 character = gltf.scene;
                 character.scale.set(6, 6, 6); 
                 scene.add(character);
-            });
+            }, undefined, (err) => console.log("GLB not found, continuing..."));
 
-            for (let i = 0; i < 40; i++) spawnSegment();
+            // 初期セグメント生成（多めに生成して道を作る）
+            for (let i = 0; i < 50; i++) spawnSegment();
 
             window.addEventListener('mousedown', (e) => {
                 if (e.target.tagName === 'A') return;
@@ -112,13 +115,19 @@
 
         function spawnSegment() {
             const group = new THREE.Group();
-            const material = new THREE.LineBasicMaterial({ color: 0x000000 });
+            const material = new THREE.LineBasicMaterial({ 
+                color: 0x000000,
+                linewidth: 2 // 注意: WebGLでは多くのブラウザで1固定ですが、気分的に。
+            });
+            
             const s = UNIT / 2;
+            // 立方体のワイヤーフレーム構造
             const pts = [
                 [-s, -s, 0], [s, -s, 0], [s, s, 0], [-s, s, 0], [-s, -s, 0],
                 [-s, -s, -UNIT], [s, -s, -UNIT], [s, s, -UNIT], [-s, s, -UNIT], [-s, -s, -UNIT],
                 null, [s, -s, 0], [s, -s, -UNIT], null, [s, s, 0], [s, s, -UNIT], null, [-s, s, 0], [-s, s, -UNIT]
             ];
+            
             let temp = [];
             pts.forEach(p => {
                 if (p === null) { draw(temp, group, material); temp = []; }
@@ -126,19 +135,25 @@
             });
             draw(temp, group, material);
 
+            // 配置
             group.position.copy(currentPos);
             group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), currentDir);
             
-            // ぐらぐら用の個別パラメータ
-            group.userData.offset = Math.random() * Math.PI * 2;
-            group.userData.speed = 0.8 + Math.random() * 1.2;
+            // 道としての基準データを保存
             group.userData.basePos = group.position.clone();
+            group.userData.baseRot = group.rotation.clone();
+            group.userData.offset = Math.random() * 10;
+            group.userData.id = segments.length;
 
             scene.add(group);
             segments.push(group);
             pathPoints.push(currentPos.clone());
+
+            // 次の座標を計算
             currentPos.add(currentDir.clone().multiplyScalar(UNIT));
-            if (Math.random() < 0.25) {
+            
+            // 曲がり角の生成（道っぽさを保つため、直進率を高めに設定）
+            if (Math.random() < 0.2) {
                 const turn = Math.random() > 0.5 ? Math.PI / 2 : -Math.PI / 2;
                 currentDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), turn).round();
             }
@@ -154,61 +169,64 @@
             requestAnimationFrame(animate);
             const time = clock.getElapsedTime();
 
-            if (pathPoints.length > 5) {
-                const nextTarget = pathPoints[1];
-                const moveVec = new THREE.Vector3().subVectors(nextTarget, camera.position);
-                if (moveVec.length() > 1) {
-                    moveVec.normalize().multiplyScalar(0.8);
-                    camera.position.add(moveVec);
-                    camera.lookAt(pathPoints[2] || nextTarget);
+            // カメラの進行（道に沿って移動）
+            if (pathPoints.length > 10) {
+                const targetPoint = pathPoints[1];
+                const direction = new THREE.Vector3().subVectors(targetPoint, camera.position);
+                
+                if (direction.length() > 2) {
+                    direction.normalize().multiplyScalar(1.2); // 移動速度
+                    camera.position.add(direction);
+                    
+                    // 常に少し先を見る
+                    const lookAtTarget = pathPoints[4] || targetPoint;
+                    camera.lookAt(lookAtTarget);
                 } else {
-                    pathPoints.shift(); spawnSegment();
+                    pathPoints.shift();
+                    spawnSegment();
                 }
             }
 
+            // キャラクターの不規則な動き
             if (character) {
-                const t = time * 0.6;
-                const orbitRadius = 70 + Math.sin(t * 0.5) * 30;
-                const targetX = camera.position.x + Math.sin(t) * orbitRadius;
-                const targetZ = camera.position.z + Math.cos(t) * orbitRadius;
-                const jumpFreq = 4;
-                const bounce = Math.abs(Math.sin(time * jumpFreq)) * 15;
-                const float = Math.sin(t * 2) * 8;
-                const targetY = (bounce + float) - 5;
-
-                if (Math.random() > 0.992) {
-                    character.position.x += (Math.random() - 0.5) * 150;
-                    character.position.z += (Math.random() - 0.5) * 150;
-                } else {
-                    character.position.lerp(new THREE.Vector3(targetX, targetY, targetZ), 0.04);
-                }
+                const t = time * 0.8;
+                const targetX = camera.position.x + Math.sin(t) * 60;
+                const targetZ = camera.position.z + Math.cos(t) * 60;
+                const bounce = Math.abs(Math.sin(time * 5)) * 12;
+                character.position.lerp(new THREE.Vector3(targetX, camera.position.y + bounce - 5, targetZ), 0.05);
                 character.lookAt(camera.position);
-                const squash = 1.0 - Math.max(0, Math.cos(time * jumpFreq * 2)) * 0.25;
-                character.scale.set(6, 6 * squash, 6);
             }
 
-            // 四角のぐらぐら更新
-            segments.forEach((seg, idx) => {
-                const o = seg.userData.offset;
-                const s = seg.userData.speed;
+            // 【最重要】セグメントの「うねる道」アニメーション
+            segments.forEach((seg, i) => {
+                const id = seg.userData.id;
+                const offset = seg.userData.offset;
+                
+                // サイン波を組み合わせて「ぐにゃぐにゃ」させる
+                // インデックス(i)を足すことで、後ろから前へ波が伝わるような動きにする
+                const waveX = Math.sin(time * 2 + i * 0.3) * 8;
+                const waveY = Math.cos(time * 1.5 + i * 0.2) * 8;
+                const roll = Math.sin(time * 2 + i * 0.4) * 0.3; // 回転の揺れ
+                const pitch = Math.cos(time * 2 + i * 0.3) * 0.2;
 
-                // 回転を不規則に
-                seg.rotation.x = Math.sin(time * s + o) * 0.2;
-                seg.rotation.y = Math.cos(time * s * 0.8 + o) * 0.2;
+                // 基準位置からのオフセットとして適用
+                seg.position.x = seg.userData.basePos.x + waveX;
+                seg.position.y = seg.userData.basePos.y + waveY;
+                
+                seg.rotation.z = roll;
+                seg.rotation.x = seg.userData.baseRot.x + pitch;
 
-                // 位置を不規則に（漂い）
-                const drift = 4.0;
-                seg.position.x = seg.userData.basePos.x + Math.sin(time * s + o) * drift;
-                seg.position.y = seg.userData.basePos.y + Math.cos(time * s * 1.2 + o) * drift;
-
-                if (camera.position.distanceTo(seg.position) > 1200) {
-                    scene.remove(seg); segments.splice(idx, 1);
+                // 古いセグメントの削除
+                if (camera.position.distanceTo(seg.position) > 1000) {
+                    scene.remove(seg);
+                    segments.splice(i, 1);
                 }
             });
 
+            // マウス操作の反映
             camera.rotation.x += targetRotX;
             camera.rotation.y += targetRotY;
-            if (!isDragging) { targetRotX *= 0.95; targetRotY *= 0.95; }
+            if (!isDragging) { targetRotX *= 0.9; targetRotY *= 0.9; }
 
             renderer.render(scene, camera);
         }
