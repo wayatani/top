@@ -57,7 +57,6 @@
         let currentDir = new THREE.Vector3(0, 0, -1);
         let pathPoints = [];
 
-        // キャラクター設定
         let character = null;
         const loader = new GLTFLoader();
 
@@ -77,14 +76,11 @@
 
             clock = new THREE.Clock();
 
-            // 環境光
             scene.add(new THREE.AmbientLight(0xffffff, 1.2));
             const sun = new THREE.DirectionalLight(0xffffff, 0.8);
             sun.position.set(50, 50, 50);
             scene.add(sun);
 
-            // GLB読み込み（GitHub上の相対パスを指定）
-            // char.glb という名前で同じ階層に置いている想定です
             loader.load('char.glb', (gltf) => {
                 character = gltf.scene;
                 character.scale.set(6, 6, 6); 
@@ -132,6 +128,12 @@
 
             group.position.copy(currentPos);
             group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), currentDir);
+            
+            // ぐらぐら用の個別パラメータ
+            group.userData.offset = Math.random() * Math.PI * 2;
+            group.userData.speed = 0.8 + Math.random() * 1.2;
+            group.userData.basePos = group.position.clone();
+
             scene.add(group);
             segments.push(group);
             pathPoints.push(currentPos.clone());
@@ -152,7 +154,6 @@
             requestAnimationFrame(animate);
             const time = clock.getElapsedTime();
 
-            // カメラの前進
             if (pathPoints.length > 5) {
                 const nextTarget = pathPoints[1];
                 const moveVec = new THREE.Vector3().subVectors(nextTarget, camera.position);
@@ -165,41 +166,41 @@
                 }
             }
 
-            // キャラクター：壁貫通＆不規則バウンド
             if (character) {
                 const t = time * 0.6;
-                // カメラの周囲を大きく旋回（壁を突き抜ける）
                 const orbitRadius = 70 + Math.sin(t * 0.5) * 30;
                 const targetX = camera.position.x + Math.sin(t) * orbitRadius;
                 const targetZ = camera.position.z + Math.cos(t) * orbitRadius;
-                
-                // 跳ねる動き
                 const jumpFreq = 4;
                 const bounce = Math.abs(Math.sin(time * jumpFreq)) * 15;
                 const float = Math.sin(t * 2) * 8;
                 const targetY = (bounce + float) - 5;
 
-                // グリッチテレポート
                 if (Math.random() > 0.992) {
                     character.position.x += (Math.random() - 0.5) * 150;
                     character.position.z += (Math.random() - 0.5) * 150;
-                    document.querySelector('.status').innerText = "ERROR: ENTITY_GLITCH // RE-INDEXING...";
-                    setTimeout(() => {
-                        document.querySelector('.status').innerText = "MAZE_ENGINE: RECOVERED // STATUS: ENTITY_DETECTED";
-                    }, 400);
                 } else {
                     character.position.lerp(new THREE.Vector3(targetX, targetY, targetZ), 0.04);
                 }
-
-                // カメラを凝視し、着地時に潰れる
                 character.lookAt(camera.position);
                 const squash = 1.0 - Math.max(0, Math.cos(time * jumpFreq * 2)) * 0.25;
                 character.scale.set(6, 6 * squash, 6);
             }
 
+            // 四角のぐらぐら更新
             segments.forEach((seg, idx) => {
-                seg.rotation.x += (Math.random() - 0.5) * 0.005;
-                seg.rotation.y += (Math.random() - 0.5) * 0.005;
+                const o = seg.userData.offset;
+                const s = seg.userData.speed;
+
+                // 回転を不規則に
+                seg.rotation.x = Math.sin(time * s + o) * 0.2;
+                seg.rotation.y = Math.cos(time * s * 0.8 + o) * 0.2;
+
+                // 位置を不規則に（漂い）
+                const drift = 4.0;
+                seg.position.x = seg.userData.basePos.x + Math.sin(time * s + o) * drift;
+                seg.position.y = seg.userData.basePos.y + Math.cos(time * s * 1.2 + o) * drift;
+
                 if (camera.position.distanceTo(seg.position) > 1200) {
                     scene.remove(seg); segments.splice(idx, 1);
                 }
