@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>わやたに | COSMOS DRIFT 360 RECOVER</title>
+    <title>わやたに | COSMOS DRIFT 360 SYNC</title>
     <script type="importmap">
         {
             "imports": {
@@ -15,18 +15,36 @@
         :root { --white: #ffffff; --black: #000000; --ui-font: 'Helvetica Neue', Arial, sans-serif; }
         body { margin: 0; background: var(--black); overflow: hidden; font-family: var(--ui-font); cursor: grab; }
         body:active { cursor: grabbing; }
-        #ui-header { position: fixed; top: 40px; left: 40px; z-index: 100; pointer-events: none; }
+        #ui-header { position: fixed; top: 40px; left: 40px; z-index: 100; pointer-events: none; opacity: 0; transition: opacity 0.5s; }
         .logo { font-size: 24px; font-weight: 900; border: 2px solid var(--white); padding: 5px 15px; color: var(--white); background: transparent; display: inline-block; pointer-events: auto; text-decoration: none; letter-spacing: -1px; }
-        .status { position: fixed; bottom: 20px; left: 20px; font-family: monospace; font-size: 9px; color: var(--white); opacity: 0.5; pointer-events: none; text-transform: uppercase; letter-spacing: 1px;}
+        .status { position: fixed; bottom: 20px; left: 20px; font-family: monospace; font-size: 9px; color: var(--white); opacity: 0; pointer-events: none; text-transform: uppercase; letter-spacing: 1px; transition: opacity 0.5s;}
+        
+        /* ローディング画面のスタイル */
+        #loading-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: var(--black);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 1000; color: var(--white); transition: opacity 0.8s ease-out;
+        }
+        .loading-text { font-size: 16px; font-weight: 900; letter-spacing: 4px; margin-bottom: 20px; animate: blink 1s infinite; }
+        .bar-bg { width: 200px; height: 2px; background: rgba(255,255,255,0.2); }
+        #bar-fill { width: 0%; height: 100%; background: var(--white); transition: width 0.1s; }
+        
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
     </style>
 </head>
 <body>
+
+    <div id="loading-screen">
+        <div class="loading-text">LOADING...</div>
+        <div class="bar-bg"><div id="bar-fill"></div></div>
+    </div>
 
     <div id="ui-header">
         <a href="index.html" class="logo">わやたに</a>
     </div>
 
-    <div class="status">ENTITY_CHECK: IN_PROGRESS // STATUS: SEARCHING_GLB</div>
+    <div class="status">MODE: SYNC_DRIFT // ENTITY: ACTIVE</div>
 
     <script type="module">
         import * as THREE from 'three';
@@ -42,12 +60,19 @@
         let phi = 0, theta = 0;
         let pointerX = 0, pointerY = 0;
 
+        // 読み込み管理用
+        const loadingScreen = document.getElementById('loading-screen');
+        const barFill = document.getElementById('bar-fill');
+        const uiHeader = document.getElementById('ui-header');
+        const statusElem = document.querySelector('.status');
+        let isReady = false; // 準備完了フラグ
+
         init();
 
         function init() {
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x000000);
-            scene.fog = new THREE.FogExp2(0x000000, 0.0005); // 少しフォグを薄くして遠くを見えやすく
+            scene.fog = new THREE.FogExp2(0x000000, 0.0006);
 
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000);
             camera.position.set(0, 0, 500);
@@ -59,35 +84,67 @@
 
             clock = new THREE.Clock();
 
-            // ライトを少し強めに
-            scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+            // ライト
+            scene.add(new THREE.AmbientLight(0xffffff, 1.0));
             const pointLight = new THREE.PointLight(0xffffff, 2000, 2000);
             camera.add(pointLight); 
             scene.add(camera);
 
-            // 星屑
+            // --- 修正ポイント1：星屑を生成するが、最初は非表示にしておく ---
             const partGeom = new THREE.BufferGeometry();
             const partPos = [];
-            for (let i = 0; i < 8000; i++) {
+            for (let i = 0; i < 9000; i++) {
                 partPos.push(THREE.MathUtils.randFloatSpread(5000));
                 partPos.push(THREE.MathUtils.randFloatSpread(5000));
                 partPos.push(THREE.MathUtils.randFloatSpread(5000));
             }
             partGeom.setAttribute('position', new THREE.Float32BufferAttribute(partPos, 3));
-            particles = new THREE.Points(partGeom, new THREE.PointsMaterial({ color: 0xffffff, size: 2, transparent: true, opacity: 0.5 }));
+            particles = new THREE.Points(partGeom, new THREE.PointsMaterial({ color: 0xffffff, size: 2, transparent: true, opacity: 0.6 }));
+            particles.visible = false; // 最初は隠す
             scene.add(particles);
 
-            // --- GLB読み込み（デバッグ強化版） ---
-            const loader = new GLTFLoader();
-            // GitHub上でのパスミスを防ぐため './char.glb' に変更
+            // --- 修正ポイント2：LoadingManagerを使って読み込みを同期 ---
+            const manager = new THREE.LoadingManager();
+            
+            // 進捗バーの更新
+            manager.onProgress = function ( url, itemsLoaded, itemsTotal ) {
+                barFill.style.width = ( itemsLoaded / itemsTotal * 100 ) + '%';
+            };
+
+            // すべての読み込みが完了した時の処理
+            manager.onLoad = function ( ) {
+                console.log( 'Loading complete!' );
+                
+                // 星とGLBを同時に表示
+                if(particles) particles.visible = true;
+                objects.forEach(obj => obj.visible = true);
+                
+                // ローディング画面をフェードアウト
+                loadingScreen.style.opacity = '0';
+                setTimeout(() => {
+                    loadingScreen.style.display = 'none';
+                    uiHeader.style.opacity = '1';
+                    statusElem.style.opacity = '0.5';
+                }, 800);
+                
+                isReady = true; // アニメーション開始許可
+            };
+
+            // GLB読み込み
+            const loader = new GLTFLoader(manager); // managerを渡す
             loader.load('./char.glb', (gltf) => {
                 const masterModel = gltf.scene;
-                console.log("GLBの読み込みに成功しました:", masterModel);
-                document.querySelector('.status').innerText = "ENTITY_STATUS: ACTIVE // GLB_LOADED";
+                
+                // モデルのマテリアル調整（発光感を少し足す）
+                masterModel.traverse((child) => {
+                    if (child.isMesh) {
+                        child.material.emissive = new THREE.Color(0x111111);
+                        child.material.emissiveIntensity = 0.5;
+                    }
+                });
 
                 for (let i = 0; i < 50; i++) {
                     const instance = masterModel.clone();
-                    // 出現範囲をカメラの周囲に適切に散らす
                     instance.position.set(
                         THREE.MathUtils.randFloatSpread(4000),
                         THREE.MathUtils.randFloatSpread(4000),
@@ -95,21 +152,22 @@
                     );
                     instance.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, 0);
                     
-                    // サイズを前回より少し控えめに（15〜25倍）
-                    const s = 15 + Math.random() * 10;
+                    // サイズを前回同様の巨大設定（20〜35倍）
+                    const s = 20 + Math.random() * 15;
                     instance.scale.set(s, s, s);
                     
+                    instance.visible = false; // 最初は隠す
                     scene.add(instance);
                     objects.push(instance);
                 }
-            }, (xhr) => {
-                // 読み込み進捗を表示
-                console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
-            }, (err) => {
-                console.error("GLBの読み込みに失敗しました。ファイル名やパスを確認してください。", err);
-                document.querySelector('.status').innerText = "ENTITY_ERROR: FILE_NOT_FOUND";
+            }, undefined, (err) => {
+                console.error("GLB error:", err);
+                // エラー時もローディングは外す
+                barFill.style.width = '100%';
+                setTimeout(()=> loadingScreen.style.display = 'none', 1000);
             });
 
+            // イベントリスナー（シームレス・高感度設定を維持）
             document.addEventListener('pointerdown', (e) => {
                 isDragging = true;
                 pointerX = e.clientX;
@@ -140,6 +198,19 @@
         function animate() {
             requestAnimationFrame(animate);
             
+            // 準備ができていない時は、操作と移動をストップ
+            if (!isReady) {
+                // ローディング中はカメラをわずかに回転させておく
+                targetLon += 0.05;
+            } else {
+                // 前進
+                const moveSpeed = 1.8;
+                const direction = new THREE.Vector3();
+                camera.getWorldDirection(direction);
+                camera.position.add(direction.multiplyScalar(moveSpeed));
+            }
+            
+            // 視点更新（慣性は常に効かせる）
             lon += (targetLon - lon) * 0.15; 
             lat += (targetLat - lat) * 0.15;
             lat = Math.max(-85, Math.min(85, lat)); 
@@ -151,25 +222,24 @@
             target.setFromSphericalCoords(1, phi, theta).add(camera.position);
             camera.lookAt(target);
 
-            // 前進
-            const moveSpeed = 2.0;
-            const direction = new THREE.Vector3();
-            camera.getWorldDirection(direction);
-            camera.position.add(direction.multiplyScalar(moveSpeed));
-
             // オブジェクトのループ
             objects.forEach(obj => {
+                if(!isReady) return; // 準備完了前は動かさない
                 obj.rotation.y += 0.005;
-                // カメラから離れすぎたら前方に転生
+                obj.rotation.z += 0.002;
                 if (obj.position.distanceTo(camera.position) > 2800) {
                     const forward = new THREE.Vector3();
                     camera.getWorldDirection(forward);
-                    // カメラの向きの2000ユニット先に配置
-                    obj.position.copy(camera.position).add(forward.multiplyScalar(2000));
+                    obj.position.copy(camera.position).add(forward.multiplyScalar(2200));
                     obj.position.x += THREE.MathUtils.randFloatSpread(3000);
                     obj.position.y += THREE.MathUtils.randFloatSpread(3000);
                 }
             });
+
+            // 星屑のわずかな自転
+            if (particles && isReady) {
+                particles.rotation.y += 0.0001;
+            }
 
             renderer.render(scene, camera);
         }
