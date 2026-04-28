@@ -15,62 +15,42 @@
         :root { --white: #ffffff; --black: #000000; --ui-font: 'Helvetica Neue', Arial, sans-serif; }
         body { margin: 0; background: var(--black); overflow: hidden; font-family: var(--ui-font); cursor: grab; }
         body:active { cursor: grabbing; }
-
         #ui-header { position: fixed; top: 40px; left: 40px; z-index: 1000; }
         .logo { font-size: 24px; font-weight: 900; border: 2px solid var(--white); padding: 5px 15px; color: var(--white); background: transparent; display: inline-block; text-decoration: none; letter-spacing: -1px; pointer-events: auto; }
-        
-        #nav-container { 
-            position: fixed; right: 40px; top: 50%; transform: translateY(-50%); 
-            z-index: 9999; display: flex; flex-direction: column; gap: 25px; text-align: right; 
-            pointer-events: none;
-        }
-        .side-link { 
-            color: var(--white); text-decoration: none; font-weight: 900; font-size: 24px; 
-            letter-spacing: 2px; display: block; transition: 0.3s;
-            text-shadow: 2px 2px 4px rgba(0,0,0,1);
-            pointer-events: auto;
-            cursor: pointer;
-        }
+        #nav-container { position: fixed; right: 40px; top: 50%; transform: translateY(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 25px; text-align: right; pointer-events: none; }
+        .side-link { color: var(--white); text-decoration: none; font-weight: 900; font-size: 24px; letter-spacing: 2px; display: block; transition: 0.3s; text-shadow: 2px 2px 4px rgba(0,0,0,1); pointer-events: auto; cursor: pointer; }
         .side-link:hover { opacity: 0.5; transform: translateX(-10px); }
-
-        #loading-screen {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: var(--black); display: flex; flex-direction: column; 
-            justify-content: center; align-items: center; z-index: 10000; 
-            color: var(--white); transition: 0.8s;
-        }
+        #loading-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--black); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10000; color: var(--white); transition: 0.8s; }
     </style>
 </head>
 <body>
     <div id="loading-screen"><div style="letter-spacing:4px; font-weight:900;">LOADING...</div></div>
-
     <div id="ui-header"><a href="index.html" class="logo">わやたに</a></div>
-
     <nav id="nav-container">
         <a href="index.html?page=profile" class="side-link">PROFILE</a>
         <a href="index.html?page=works" class="side-link">WORKS</a>
         <a href="index.html?page=shop" class="side-link">SHOP</a>
         <a href="index.html?page=contact" class="side-link">CONTACT</a>
     </nav>
-
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-
         let scene, camera, renderer, objects = [], isDragging = false, isReady = false;
         let lon = 0, lat = 0, targetLon = 0, targetLat = 0, pointerX = 0, pointerY = 0;
-
         init();
         function init() {
             scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x000000);
+            scene.fog = new THREE.FogExp2(0x000000, 0.0006);
             camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 5000);
+            camera.position.set(0, 0, 500);
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
             document.body.appendChild(renderer.domElement);
             scene.add(new THREE.AmbientLight(0xffffff, 1.2));
-
             new GLTFLoader().load('./char.glb', (gltf) => {
-                for (let i = 0; i < 40; i++) {
+                for (let i = 0; i < 45; i++) {
                     const inst = gltf.scene.clone();
                     inst.position.set(THREE.MathUtils.randFloatSpread(4000), THREE.MathUtils.randFloatSpread(4000), THREE.MathUtils.randFloatSpread(4000));
                     inst.scale.set(30, 30, 30);
@@ -81,7 +61,6 @@
                 setTimeout(() => { document.getElementById('loading-screen').style.display = 'none'; }, 800);
                 isReady = true;
             });
-
             document.addEventListener('pointerdown', (e) => {
                 if (e.target.closest('#nav-container') || e.target.closest('#ui-header')) return;
                 isDragging = true; pointerX = e.clientX; pointerY = e.clientY;
@@ -100,7 +79,7 @@
             if (isReady) {
                 const dir = new THREE.Vector3();
                 camera.getWorldDirection(dir);
-                camera.position.add(dir.multiplyScalar(1.5));
+                camera.position.add(dir.multiplyScalar(1.8));
             }
             lon += (targetLon - lon) * 0.1;
             lat += (targetLat - lat) * 0.1;
