@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>わやたに | COSMOS DRIFT FINAL FULL</title>
+    <title>わやたに | COSMOS DRIFT SAME_TAB_FIX</title>
     <script type="importmap">
         {
             "imports": {
@@ -18,17 +18,20 @@
 
         /* 左上ロゴ */
         #ui-header { position: fixed; top: 40px; left: 40px; z-index: 1000; }
-        .logo { font-size: 24px; font-weight: 900; border: 2px solid var(--white); padding: 5px 15px; color: var(--white); background: transparent; display: inline-block; text-decoration: none; letter-spacing: -1px; }
+        .logo { font-size: 24px; font-weight: 900; border: 2px solid var(--white); padding: 5px 15px; color: var(--white); background: transparent; display: inline-block; text-decoration: none; letter-spacing: -1px; pointer-events: auto; }
         
-        /* 右側メニュー（タブ）: 別タブ設定 */
+        /* 右側メニュー（タブ）: target="_blank" を削除し同一タブで開く設定 */
         #nav-container { 
             position: fixed; right: 40px; top: 50%; transform: translateY(-50%); 
             z-index: 9999; display: flex; flex-direction: column; gap: 25px; text-align: right; 
+            pointer-events: none;
         }
         .side-link { 
             color: var(--white); text-decoration: none; font-weight: 900; font-size: 24px; 
             letter-spacing: 2px; display: block; transition: 0.3s;
             text-shadow: 2px 2px 4px rgba(0,0,0,1);
+            pointer-events: auto;
+            cursor: pointer;
         }
         .side-link:hover { opacity: 0.5; transform: translateX(-10px); }
 
@@ -41,8 +44,6 @@
             color: var(--white); transition: 0.8s;
         }
         .loading-text { font-size: 16px; font-weight: 900; letter-spacing: 4px; animation: blink 1s infinite; }
-        .bar-bg { width: 200px; height: 2px; background: rgba(255,255,255,0.2); margin-top: 10px; }
-        #bar-fill { width: 0%; height: 100%; background: var(--white); transition: width 0.1s; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
     </style>
 </head>
@@ -50,7 +51,6 @@
 
     <div id="loading-screen">
         <div class="loading-text">LOADING...</div>
-        <div class="bar-bg"><div id="bar-fill"></div></div>
     </div>
 
     <div id="ui-header">
@@ -58,21 +58,20 @@
     </div>
 
     <nav id="nav-container">
-        <a href="profile.html" class="side-link" target="_blank">PROFILE</a>
-        <a href="works.html" class="side-link" target="_blank">WORKS</a>
-        <a href="shop.html" class="side-link" target="_blank">SHOP</a>
-        <a href="contact.html" class="side-link" target="_blank">CONTACT</a>
+        <a href="index.html" class="side-link">PROFILE</a>
+        <a href="index.html" class="side-link">WORKS</a>
+        <a href="index.html" class="side-link">SHOP</a>
+        <a href="index.html" class="side-link">CONTACT</a>
     </nav>
 
-    <div class="status">MODE: SYNC_DRIFT // NAV: EXTERNAL_TAB // ENTITY: ACTIVE</div>
+    <div class="status">MODE: COSMOS_DRIFT // LINK: SAME_TAB_ENABLED // ENTITY: ACTIVE</div>
 
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-        let scene, camera, renderer, clock;
+        let scene, camera, renderer;
         let objects = [];
-        let particles;
         let isDragging = false;
         let lon = 0, lat = 0, targetLon = 0, targetLat = 0, pointerX = 0, pointerY = 0;
         let isReady = false;
@@ -91,15 +90,12 @@
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
-            clock = new THREE.Clock();
 
-            // ライト設定
             scene.add(new THREE.AmbientLight(0xffffff, 1.2));
             const pointLight = new THREE.PointLight(0xffffff, 2000, 2000);
             camera.add(pointLight); 
             scene.add(camera);
 
-            // 星屑
             const partGeom = new THREE.BufferGeometry();
             const partPos = [];
             for (let i = 0; i < 9000; i++) {
@@ -108,23 +104,9 @@
                 partPos.push(THREE.MathUtils.randFloatSpread(5000));
             }
             partGeom.setAttribute('position', new THREE.Float32BufferAttribute(partPos, 3));
-            particles = new THREE.Points(partGeom, new THREE.PointsMaterial({ color: 0xffffff, size: 2, transparent: true, opacity: 0.6 }));
-            particles.visible = false;
-            scene.add(particles);
+            scene.add(new THREE.Points(partGeom, new THREE.PointsMaterial({ color: 0xffffff, size: 2, transparent: true, opacity: 0.6 })));
 
-            const manager = new THREE.LoadingManager();
-            manager.onProgress = (url, loaded, total) => {
-                document.getElementById('bar-fill').style.width = (loaded/total*100)+'%';
-            };
-            manager.onLoad = () => {
-                if(particles) particles.visible = true;
-                objects.forEach(obj => obj.visible = true);
-                document.getElementById('loading-screen').style.opacity = '0';
-                setTimeout(() => { document.getElementById('loading-screen').style.display = 'none'; }, 800);
-                isReady = true;
-            };
-
-            const loader = new GLTFLoader(manager);
+            const loader = new GLTFLoader();
             loader.load('./char.glb', (gltf) => {
                 const masterModel = gltf.scene;
                 masterModel.traverse((child) => {
@@ -139,29 +121,38 @@
                     instance.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, 0);
                     const s = 25 + Math.random() * 15;
                     instance.scale.set(s, s, s);
-                    instance.visible = false;
                     scene.add(instance);
                     objects.push(instance);
                 }
+                document.getElementById('loading-screen').style.opacity = '0';
+                setTimeout(() => { document.getElementById('loading-screen').style.display = 'none'; }, 800);
+                isReady = true;
             });
 
-            // インタラクション
+            // メニュークリック時の判定
             document.addEventListener('pointerdown', (e) => {
-                if(e.target.closest('#nav-container') || e.target.closest('#ui-header')) return; 
-                isDragging = true; pointerX = e.clientX; pointerY = e.clientY;
+                if (e.target.closest('#nav-container') || e.target.closest('#ui-header')) return;
+                isDragging = true;
+                pointerX = e.clientX;
+                pointerY = e.clientY;
             });
+
             document.addEventListener('pointermove', (e) => {
                 if (!isDragging) return;
-                targetLon -= (e.clientX - pointerX) * 0.4; // 360度見回し感度
+                targetLon -= (e.clientX - pointerX) * 0.4;
                 targetLat -= (e.clientY - pointerY) * 0.3;
-                pointerX = e.clientX; pointerY = e.clientY;
+                pointerX = e.clientX;
+                pointerY = e.clientY;
             });
-            document.addEventListener('pointerup', () => isDragging = false);
+
+            document.addEventListener('pointerup', () => { isDragging = false; });
+
             window.addEventListener('resize', () => {
                 camera.aspect = window.innerWidth / window.innerHeight;
                 camera.updateProjectionMatrix();
                 renderer.setSize(window.innerWidth, window.innerHeight);
             });
+
             animate();
         }
 
@@ -170,15 +161,11 @@
             if (isReady) {
                 const direction = new THREE.Vector3();
                 camera.getWorldDirection(direction);
-                camera.position.add(direction.multiplyScalar(1.8)); // 前進
-            } else {
-                targetLon += 0.05;
+                camera.position.add(direction.multiplyScalar(1.8));
             }
-            
             lon += (targetLon - lon) * 0.15; 
             lat += (targetLat - lat) * 0.15;
-            lat = Math.max(-85, Math.min(85, lat)); // 逆さま防止
-            
+            lat = Math.max(-85, Math.min(85, lat));
             const phi = THREE.MathUtils.degToRad(90 - lat);
             const theta = THREE.MathUtils.degToRad(lon);
             const target = new THREE.Vector3();
@@ -186,7 +173,6 @@
             camera.lookAt(target);
 
             objects.forEach(obj => {
-                if(!isReady) return;
                 obj.rotation.y += 0.005;
                 if (obj.position.distanceTo(camera.position) > 2800) {
                     const forward = new THREE.Vector3();
@@ -196,7 +182,6 @@
                     obj.position.y += THREE.MathUtils.randFloatSpread(3000);
                 }
             });
-            if (particles) particles.rotation.y += 0.0001;
             renderer.render(scene, camera);
         }
     </script>
