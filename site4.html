@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>わやたに | COSMOS DRIFT</title>
+    <title>わやたに | VOID GAME</title>
     <script type="importmap">
         {
             "imports": {
@@ -15,79 +15,181 @@
         :root { --white: #ffffff; --black: #000000; --ui-font: 'Helvetica Neue', Arial, sans-serif; }
         body { margin: 0; background: var(--black); overflow: hidden; font-family: var(--ui-font); cursor: grab; }
         body:active { cursor: grabbing; }
+
+        /* UI */
         #ui-header { position: fixed; top: 40px; left: 40px; z-index: 1000; }
-        .logo { font-size: 24px; font-weight: 900; border: 2px solid var(--white); padding: 5px 15px; color: var(--white); background: transparent; display: inline-block; text-decoration: none; letter-spacing: -1px; pointer-events: auto; }
-        #nav-container { position: fixed; right: 40px; top: 50%; transform: translateY(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 25px; text-align: right; pointer-events: none; }
-        .side-link { color: var(--white); text-decoration: none; font-weight: 900; font-size: 24px; letter-spacing: 2px; display: block; transition: 0.3s; text-shadow: 2px 2px 4px rgba(0,0,0,1); pointer-events: auto; cursor: pointer; }
-        .side-link:hover { opacity: 0.5; transform: translateX(-10px); }
-        #loading-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--black); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10000; color: var(--white); transition: 0.8s; }
+        .logo { font-size: 24px; font-weight: 900; border: 2px solid var(--white); padding: 5px 15px; color: var(--white); text-decoration: none; letter-spacing: -1px; }
+        
+        /* スコア表示 */
+        #score-board { position: fixed; top: 40px; right: 40px; color: var(--white); font-size: 32px; font-weight: 900; z-index: 1000; letter-spacing: 2px; }
+
+        /* ゲームオーバー画面 */
+        #game-over {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); display: none; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 2000; color: var(--white);
+        }
+        .retry-btn { margin-top: 20px; padding: 10px 30px; border: 2px solid var(--white); background: none; color: var(--white); cursor: pointer; font-weight: 900; }
+
+        #nav-container { position: fixed; right: 40px; bottom: 40px; z-index: 999; display: flex; flex-direction: column; gap: 15px; text-align: right; }
+        .side-link { color: var(--white); text-decoration: none; font-weight: 900; font-size: 18px; opacity: 0.6; transition: 0.3s; }
+        .side-link:hover { opacity: 1; }
     </style>
 </head>
 <body>
-    <div id="loading-screen"><div style="letter-spacing:4px; font-weight:900;">LOADING...</div></div>
+
     <div id="ui-header"><a href="index.html" class="logo">わやたに</a></div>
+    <div id="score-board">SCORE: 0</div>
+
+    <div id="game-over">
+        <h1 style="font-size: 80px; letter-spacing: 10px;">GAME OVER</h1>
+        <button class="retry-btn" onclick="location.reload()">RETRY</button>
+    </div>
+
     <nav id="nav-container">
         <a href="index.html?page=profile" class="side-link">PROFILE</a>
-        <a href="index.html?page=works" class="side-link">WORKS</a>
-        <a href="index.html?page=shop" class="side-link">SHOP</a>
-        <a href="index.html?page=contact" class="side-link">CONTACT</a>
     </nav>
+
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-        let scene, camera, renderer, objects = [], isDragging = false, isReady = false;
-        let lon = 0, lat = 0, targetLon = 0, targetLat = 0, pointerX = 0, pointerY = 0;
+
+        let scene, camera, renderer, clock;
+        let items = []; // 得点アイテム(GLB)
+        let bombs = []; // 爆弾(球体)
+        let score = 0;
+        let isGameOver = false;
+
+        let lon = 0, lat = 0, targetLon = 0, targetLat = 0, pointerX = 0, pointerY = 0, isDragging = false;
+
         init();
+
         function init() {
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x000000);
-            scene.fog = new THREE.FogExp2(0x000000, 0.0006);
+            scene.fog = new THREE.FogExp2(0x000000, 0.0007);
+
             camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 5000);
             camera.position.set(0, 0, 500);
+
             renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
-            scene.add(new THREE.AmbientLight(0xffffff, 1.2));
-            new GLTFLoader().load('./char.glb', (gltf) => {
-                for (let i = 0; i < 45; i++) {
-                    const inst = gltf.scene.clone();
-                    inst.position.set(THREE.MathUtils.randFloatSpread(4000), THREE.MathUtils.randFloatSpread(4000), THREE.MathUtils.randFloatSpread(4000));
-                    inst.scale.set(30, 30, 30);
-                    scene.add(inst);
-                    objects.push(inst);
-                }
-                document.getElementById('loading-screen').style.opacity = '0';
-                setTimeout(() => { document.getElementById('loading-screen').style.display = 'none'; }, 800);
-                isReady = true;
+
+            clock = new THREE.Clock();
+
+            // ライト
+            scene.add(new THREE.AmbientLight(0xffffff, 1.0));
+            const pLight = new THREE.PointLight(0xffffff, 2000, 1500);
+            camera.add(pLight);
+            scene.add(camera);
+
+            // 背景の星
+            const starGeom = new THREE.BufferGeometry();
+            const starPos = [];
+            for(let i=0; i<5000; i++) {
+                starPos.push(THREE.MathUtils.randFloatSpread(4000), THREE.MathUtils.randFloatSpread(4000), THREE.MathUtils.randFloatSpread(4000));
+            }
+            starGeom.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3));
+            scene.add(new THREE.Points(starGeom, new THREE.PointsMaterial({color: 0xffffff, size: 2})));
+
+            // GLB読み込み
+            const loader = new GLTFLoader();
+            loader.load('./char.glb', (gltf) => {
+                for(let i=0; i<30; i++) spawnItem(gltf.scene.clone());
             });
-            document.addEventListener('pointerdown', (e) => {
-                if (e.target.closest('#nav-container') || e.target.closest('#ui-header')) return;
-                isDragging = true; pointerX = e.clientX; pointerY = e.clientY;
-            });
-            document.addEventListener('pointermove', (e) => {
-                if (!isDragging) return;
-                targetLon -= (e.clientX - pointerX) * 0.4;
-                targetLat -= (e.clientY - pointerY) * 0.3;
-                pointerX = e.clientX; pointerY = e.clientY;
-            });
+
+            // 爆弾の初期生成
+            for(let i=0; i<20; i++) spawnBomb();
+
+            // インタラクション
+            document.addEventListener('pointerdown', e => { if(e.target.closest('#nav-container')) return; isDragging = true; pointerX = e.clientX; pointerY = e.clientY; });
+            document.addEventListener('pointermove', e => { if(!isDragging) return; targetLon -= (e.clientX - pointerX)*0.4; targetLat -= (e.clientY - pointerY)*0.3; pointerX = e.clientX; pointerY = e.clientY; });
             document.addEventListener('pointerup', () => isDragging = false);
+
             animate();
         }
+
+        // 得点アイテム(GLB)の生成
+        function spawnItem(model) {
+            model.position.set(THREE.MathUtils.randFloatSpread(3000), THREE.MathUtils.randFloatSpread(3000), THREE.MathUtils.randFloatSpread(3000));
+            model.scale.set(20, 20, 20);
+            scene.add(model);
+            items.push(model);
+        }
+
+        // 爆弾(暗い球体)の生成
+        function spawnBomb() {
+            const geom = new THREE.SphereGeometry(15, 16, 16);
+            const mat = new THREE.MeshPhongMaterial({ color: 0x220000, emissive: 0x110000 });
+            const bomb = new THREE.Mesh(geom, mat);
+            bomb.position.set(THREE.MathUtils.randFloatSpread(3000), THREE.MathUtils.randFloatSpread(3000), THREE.MathUtils.randFloatSpread(3000));
+            scene.add(bomb);
+            bombs.push(bomb);
+        }
+
         function animate() {
+            if (isGameOver) return;
             requestAnimationFrame(animate);
-            if (isReady) {
-                const dir = new THREE.Vector3();
-                camera.getWorldDirection(dir);
-                camera.position.add(dir.multiplyScalar(1.8));
-            }
+
+            // カメラ前進
+            const dir = new THREE.Vector3();
+            camera.getWorldDirection(dir);
+            camera.position.add(dir.multiplyScalar(2.5));
+
+            // 視点更新
             lon += (targetLon - lon) * 0.1;
             lat += (targetLat - lat) * 0.1;
             lat = Math.max(-85, Math.min(85, lat));
             const target = new THREE.Vector3();
             target.setFromSphericalCoords(1, THREE.MathUtils.degToRad(90-lat), THREE.MathUtils.degToRad(lon)).add(camera.position);
             camera.lookAt(target);
+
+            // 当たり判定：得点アイテム
+            items.forEach((item, idx) => {
+                item.rotation.y += 0.02;
+                const dist = camera.position.distanceTo(item.position);
+                
+                // 接触 (距離が40以下)
+                if (dist < 40) {
+                    score += 100;
+                    document.getElementById('score-board').innerText = `SCORE: ${score}`;
+                    // 前方に再配置
+                    const fwd = new THREE.Vector3();
+                    camera.getWorldDirection(fwd);
+                    item.position.copy(camera.position).add(fwd.multiplyScalar(2000));
+                    item.position.x += THREE.MathUtils.randFloatSpread(1000);
+                    item.position.y += THREE.MathUtils.randFloatSpread(1000);
+                }
+                if (dist > 3000) { // 遠すぎたら前方へ
+                    const fwd = new THREE.Vector3();
+                    camera.getWorldDirection(fwd);
+                    item.position.copy(camera.position).add(fwd.multiplyScalar(2000));
+                }
+            });
+
+            // 当たり判定：爆弾
+            bombs.forEach(bomb => {
+                const dist = camera.position.distanceTo(bomb.position);
+                if (dist < 30) {
+                    gameOver();
+                }
+                if (dist > 3000) {
+                    const fwd = new THREE.Vector3();
+                    camera.getWorldDirection(fwd);
+                    bomb.position.copy(camera.position).add(fwd.multiplyScalar(2000));
+                    bomb.position.x += THREE.MathUtils.randFloatSpread(1500);
+                    bomb.position.y += THREE.MathUtils.randFloatSpread(1500);
+                }
+            });
+
             renderer.render(scene, camera);
+        }
+
+        function gameOver() {
+            isGameOver = true;
+            document.getElementById('game-over').style.display = 'flex';
         }
     </script>
 </body>
