@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>わやたに | COSMOS DRIFT 360 FULL</title>
+    <title>わやたに | COSMOS DRIFT 360 RECOVER</title>
     <script type="importmap">
         {
             "imports": {
@@ -26,7 +26,7 @@
         <a href="index.html" class="logo">わやたに</a>
     </div>
 
-    <div class="status">CONTROL: ACTIVE_DRAG // MODE: FULL_360_VIEW // ENTITY: GIANT_GLB</div>
+    <div class="status">ENTITY_CHECK: IN_PROGRESS // STATUS: SEARCHING_GLB</div>
 
     <script type="module">
         import * as THREE from 'three';
@@ -47,9 +47,9 @@
         function init() {
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x000000);
-            scene.fog = new THREE.FogExp2(0x000000, 0.0006);
+            scene.fog = new THREE.FogExp2(0x000000, 0.0005); // 少しフォグを薄くして遠くを見えやすく
 
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 4000);
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000);
             camera.position.set(0, 0, 500);
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -59,43 +59,56 @@
 
             clock = new THREE.Clock();
 
-            scene.add(new THREE.AmbientLight(0xffffff, 0.9));
-            const pointLight = new THREE.PointLight(0xffffff, 1500, 1000);
+            // ライトを少し強めに
+            scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+            const pointLight = new THREE.PointLight(0xffffff, 2000, 2000);
             camera.add(pointLight); 
             scene.add(camera);
 
+            // 星屑
             const partGeom = new THREE.BufferGeometry();
             const partPos = [];
-            for (let i = 0; i < 10000; i++) {
-                partPos.push(THREE.MathUtils.randFloatSpread(4000));
-                partPos.push(THREE.MathUtils.randFloatSpread(4000));
-                partPos.push(THREE.MathUtils.randFloatSpread(4000));
+            for (let i = 0; i < 8000; i++) {
+                partPos.push(THREE.MathUtils.randFloatSpread(5000));
+                partPos.push(THREE.MathUtils.randFloatSpread(5000));
+                partPos.push(THREE.MathUtils.randFloatSpread(5000));
             }
             partGeom.setAttribute('position', new THREE.Float32BufferAttribute(partPos, 3));
-            particles = new THREE.Points(partGeom, new THREE.PointsMaterial({ color: 0xffffff, size: 2, transparent: true, opacity: 0.6 }));
+            particles = new THREE.Points(partGeom, new THREE.PointsMaterial({ color: 0xffffff, size: 2, transparent: true, opacity: 0.5 }));
             scene.add(particles);
 
+            // --- GLB読み込み（デバッグ強化版） ---
             const loader = new GLTFLoader();
-            loader.load('char.glb', (gltf) => {
+            // GitHub上でのパスミスを防ぐため './char.glb' に変更
+            loader.load('./char.glb', (gltf) => {
                 const masterModel = gltf.scene;
-                for (let i = 0; i < 40; i++) {
+                console.log("GLBの読み込みに成功しました:", masterModel);
+                document.querySelector('.status').innerText = "ENTITY_STATUS: ACTIVE // GLB_LOADED";
+
+                for (let i = 0; i < 50; i++) {
                     const instance = masterModel.clone();
+                    // 出現範囲をカメラの周囲に適切に散らす
                     instance.position.set(
-                        THREE.MathUtils.randFloatSpread(3000),
-                        THREE.MathUtils.randFloatSpread(3000),
-                        THREE.MathUtils.randFloatSpread(3000)
+                        THREE.MathUtils.randFloatSpread(4000),
+                        THREE.MathUtils.randFloatSpread(4000),
+                        THREE.MathUtils.randFloatSpread(4000)
                     );
                     instance.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, 0);
                     
-                    // --- GLBの大きさを調整（30倍に拡大） ---
-                    // もしこれでも小さい場合は数値を上げてください
-                    const s = 25 + Math.random() * 10;
+                    // サイズを前回より少し控えめに（15〜25倍）
+                    const s = 15 + Math.random() * 10;
                     instance.scale.set(s, s, s);
                     
                     scene.add(instance);
                     objects.push(instance);
                 }
-            }, undefined, (err) => console.log("GLB load error."));
+            }, (xhr) => {
+                // 読み込み進捗を表示
+                console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
+            }, (err) => {
+                console.error("GLBの読み込みに失敗しました。ファイル名やパスを確認してください。", err);
+                document.querySelector('.status').innerText = "ENTITY_ERROR: FILE_NOT_FOUND";
+            });
 
             document.addEventListener('pointerdown', (e) => {
                 isDragging = true;
@@ -107,19 +120,13 @@
                 if (!isDragging) return;
                 const deltaX = e.clientX - pointerX;
                 const deltaY = e.clientY - pointerY;
-
-                // --- 修正ポイント：ドラッグの感度を大幅に強化 ---
-                // これでシームレスに全方位（左右）を見回せます
                 targetLon -= deltaX * 0.4; 
                 targetLat -= deltaY * 0.3;
-
                 pointerX = e.clientX;
                 pointerY = e.clientY;
             });
 
-            document.addEventListener('pointerup', () => {
-                isDragging = false;
-            });
+            document.addEventListener('pointerup', () => isDragging = false);
 
             window.addEventListener('resize', () => {
                 camera.aspect = window.innerWidth / window.innerHeight;
@@ -132,14 +139,9 @@
 
         function animate() {
             requestAnimationFrame(animate);
-            const time = clock.getElapsedTime();
-
-            // --- 滑らかさ（Lerp）の追従速度も少し上げる ---
+            
             lon += (targetLon - lon) * 0.15; 
             lat += (targetLat - lat) * 0.15;
-            
-            // --- 画面の逆さまを防止する上下制限 ---
-            // 上下も無限に回したい場合はここを外しますが、逆さまになります
             lat = Math.max(-85, Math.min(85, lat)); 
 
             phi = THREE.MathUtils.degToRad(90 - lat);
@@ -149,31 +151,25 @@
             target.setFromSphericalCoords(1, phi, theta).add(camera.position);
             camera.lookAt(target);
 
-            // --- 進行方向へ進む ---
-            camera.getWorldDirection(new THREE.Vector3()); // dummy for update
-            const moveSpeed = 1.8;
-            const direction = camera.getWorldDirection(new THREE.Vector3());
+            // 前進
+            const moveSpeed = 2.0;
+            const direction = new THREE.Vector3();
+            camera.getWorldDirection(direction);
             camera.position.add(direction.multiplyScalar(moveSpeed));
 
-            // --- オブジェクトのループ（転生）ロジック ---
+            // オブジェクトのループ
             objects.forEach(obj => {
-                obj.rotation.y += 0.003;
-                obj.rotation.z += 0.001;
-
-                if (obj.position.distanceTo(camera.position) > 2500) {
-                    const forward = camera.getWorldDirection(new THREE.Vector3());
-                    // 巨大モデルなので、カメラから少し遠くに配置
+                obj.rotation.y += 0.005;
+                // カメラから離れすぎたら前方に転生
+                if (obj.position.distanceTo(camera.position) > 2800) {
+                    const forward = new THREE.Vector3();
+                    camera.getWorldDirection(forward);
+                    // カメラの向きの2000ユニット先に配置
                     obj.position.copy(camera.position).add(forward.multiplyScalar(2000));
-                    
                     obj.position.x += THREE.MathUtils.randFloatSpread(3000);
                     obj.position.y += THREE.MathUtils.randFloatSpread(3000);
-                    obj.position.z += THREE.MathUtils.randFloatSpread(500);
                 }
             });
-
-            if (particles) {
-                particles.rotation.y += 0.0001;
-            }
 
             renderer.render(scene, camera);
         }
