@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>わやたに | Wobbly Infinite Maze</title>
+    <title>わやたに | Dark Wobbly Maze</title>
     <script type="importmap">
         {
             "imports": {
@@ -14,17 +14,21 @@
     <style>
         :root {
             --ui-font: 'Helvetica Neue', Arial, sans-serif;
-            --black: #000000;
             --white: #ffffff;
+            --black: #000000;
         }
-        body { margin: 0; background: var(--white); overflow: hidden; font-family: var(--ui-font); cursor: grab; }
+        body { margin: 0; background: var(--black); overflow: hidden; font-family: var(--ui-font); cursor: grab; }
         body:active { cursor: grabbing; }
+        
+        /* UIを白抜きにして視認性を確保 */
         #ui-header { position: fixed; top: 40px; left: 40px; z-index: 100; pointer-events: none; }
-        .logo { font-size: 24px; font-weight: 900; border: 2px solid var(--black); padding: 5px 15px; background: var(--white); display: inline-block; pointer-events: auto; letter-spacing: -1px; }
+        .logo { font-size: 24px; font-weight: 900; border: 2px solid var(--white); padding: 5px 15px; color: var(--white); background: transparent; display: inline-block; pointer-events: auto; letter-spacing: -1px; }
+        
         #nav-container { position: fixed; right: 40px; top: 50%; transform: translateY(-50%); z-index: 200; display: flex; flex-direction: column; gap: 20px; text-align: right; pointer-events: none; }
-        .side-link { pointer-events: auto; text-decoration: none; color: var(--black); font-weight: 900; font-size: 24px; letter-spacing: 2px; transition: opacity 0.2s, transform 0.2s; display: block; }
+        .side-link { pointer-events: auto; text-decoration: none; color: var(--white); font-weight: 900; font-size: 24px; letter-spacing: 2px; transition: opacity 0.2s, transform 0.2s; display: block; }
         .side-link:hover { opacity: 0.5; transform: translateX(-10px); }
-        .status { position: fixed; bottom: 20px; left: 20px; font-family: monospace; font-size: 9px; opacity: 0.3; pointer-events: none; text-transform: uppercase; }
+        
+        .status { position: fixed; bottom: 20px; left: 20px; font-family: monospace; font-size: 9px; color: var(--white); opacity: 0.5; pointer-events: none; text-transform: uppercase; }
     </style>
 </head>
 <body>
@@ -40,7 +44,7 @@
         <a href="#" class="side-link">CONTACT</a>
     </nav>
 
-    <div class="status">MAZE_ENGINE: HIGH_WOBBLE_MODE // STATUS: STABILIZING_PATH</div>
+    <div class="status">MODE: NOIR_DRIFT // FOG: ENABLED // ENTITY: GLB_LOADED</div>
 
     <script type="module">
         import * as THREE from 'three';
@@ -57,16 +61,19 @@
         let currentDir = new THREE.Vector3(0, 0, -1);
         let pathPoints = [];
 
-        let character = null;
+        let model = null; // GLBモデル用
         const loader = new GLTFLoader();
 
         init();
 
         function init() {
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0xffffff);
+            scene.background = new THREE.Color(0x000000); // 真っ黒
             
-            // 視野角を少し広げて没入感をアップ
+            // --- フォグ（霧）の設定 ---
+            // 第2引数の数値(0.015)を大きくすると霧が濃くなり、近くまで見えなくなります
+            scene.fog = new THREE.FogExp2(0x000000, 0.012);
+
             camera = new THREE.PerspectiveCamera(85, window.innerWidth / window.innerHeight, 0.1, 2000);
             camera.position.set(0, 0, 0);
 
@@ -77,20 +84,24 @@
 
             clock = new THREE.Clock();
 
-            scene.add(new THREE.AmbientLight(0xffffff, 1.5));
-            const sun = new THREE.DirectionalLight(0xffffff, 1.0);
-            sun.position.set(50, 80, 50);
-            scene.add(sun);
+            // 暗闇でもモデルが見えるようにライトを追加
+            scene.add(new THREE.AmbientLight(0xffffff, 1.0));
+            const pointLight = new THREE.PointLight(0xffffff, 1000);
+            camera.add(pointLight); // カメラに追従するライト
+            scene.add(camera);
 
-            // キャラクター読み込み
+            // --- GLBデータの読み込み ---
+            // 'your-model.glb' を自分のファイル名に書き換えてください
             loader.load('char.glb', (gltf) => {
-                character = gltf.scene;
-                character.scale.set(6, 6, 6); 
-                scene.add(character);
-            }, undefined, (err) => console.log("GLB not found, continuing..."));
+                model = gltf.scene;
+                model.scale.set(8, 8, 8); 
+                scene.add(model);
+            }, undefined, (error) => {
+                console.warn("GLBが見つかりません。デフォルトのモデルを待機します。");
+            });
 
-            // 初期セグメント生成（多めに生成して道を作る）
-            for (let i = 0; i < 50; i++) spawnSegment();
+            // 道の初期生成
+            for (let i = 0; i < 60; i++) spawnSegment();
 
             window.addEventListener('mousedown', (e) => {
                 if (e.target.tagName === 'A') return;
@@ -115,13 +126,10 @@
 
         function spawnSegment() {
             const group = new THREE.Group();
-            const material = new THREE.LineBasicMaterial({ 
-                color: 0x000000,
-                linewidth: 2 // 注意: WebGLでは多くのブラウザで1固定ですが、気分的に。
-            });
+            // 発光しているように見える白い線
+            const material = new THREE.LineBasicMaterial({ color: 0xffffff });
             
             const s = UNIT / 2;
-            // 立方体のワイヤーフレーム構造
             const pts = [
                 [-s, -s, 0], [s, -s, 0], [s, s, 0], [-s, s, 0], [-s, -s, 0],
                 [-s, -s, -UNIT], [s, -s, -UNIT], [s, s, -UNIT], [-s, s, -UNIT], [-s, -s, -UNIT],
@@ -135,25 +143,20 @@
             });
             draw(temp, group, material);
 
-            // 配置
             group.position.copy(currentPos);
             group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), currentDir);
             
-            // 道としての基準データを保存
             group.userData.basePos = group.position.clone();
             group.userData.baseRot = group.rotation.clone();
-            group.userData.offset = Math.random() * 10;
-            group.userData.id = segments.length;
 
             scene.add(group);
             segments.push(group);
             pathPoints.push(currentPos.clone());
 
-            // 次の座標を計算
             currentPos.add(currentDir.clone().multiplyScalar(UNIT));
             
-            // 曲がり角の生成（道っぽさを保つため、直進率を高めに設定）
-            if (Math.random() < 0.2) {
+            // 直進性を高くして「道」を形成
+            if (Math.random() < 0.15) {
                 const turn = Math.random() > 0.5 ? Math.PI / 2 : -Math.PI / 2;
                 currentDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), turn).round();
             }
@@ -169,17 +172,15 @@
             requestAnimationFrame(animate);
             const time = clock.getElapsedTime();
 
-            // カメラの進行（道に沿って移動）
+            // カメラの前進
             if (pathPoints.length > 10) {
                 const targetPoint = pathPoints[1];
                 const direction = new THREE.Vector3().subVectors(targetPoint, camera.position);
                 
                 if (direction.length() > 2) {
-                    direction.normalize().multiplyScalar(1.2); // 移動速度
+                    direction.normalize().multiplyScalar(1.0); // 少しゆったり進む
                     camera.position.add(direction);
-                    
-                    // 常に少し先を見る
-                    const lookAtTarget = pathPoints[4] || targetPoint;
+                    const lookAtTarget = pathPoints[5] || targetPoint;
                     camera.lookAt(lookAtTarget);
                 } else {
                     pathPoints.shift();
@@ -187,43 +188,43 @@
                 }
             }
 
-            // キャラクターの不規則な動き
-            if (character) {
-                const t = time * 0.8;
-                const targetX = camera.position.x + Math.sin(t) * 60;
-                const targetZ = camera.position.z + Math.cos(t) * 60;
-                const bounce = Math.abs(Math.sin(time * 5)) * 12;
-                character.position.lerp(new THREE.Vector3(targetX, camera.position.y + bounce - 5, targetZ), 0.05);
-                character.lookAt(camera.position);
+            // --- GLBモデルの浮遊アニメーション ---
+            if (model) {
+                const t = time * 0.5;
+                // カメラの少し先をふわふわ漂う
+                const driftX = Math.sin(t) * 40;
+                const driftY = Math.cos(t * 1.2) * 20;
+                const forwardOffset = -100; // カメラの100ユニット前方
+                
+                // カメラの向きに合わせて位置を計算
+                const targetPos = new THREE.Vector3(driftX, driftY, forwardOffset);
+                targetPos.applyQuaternion(camera.quaternion);
+                targetPos.add(camera.position);
+
+                model.position.lerp(targetPos, 0.05);
+                model.rotation.y += 0.01;
+                model.rotation.z = Math.sin(t) * 0.2;
             }
 
-            // 【最重要】セグメントの「うねる道」アニメーション
+            // --- 道のぐらぐらアニメーション ---
             segments.forEach((seg, i) => {
-                const id = seg.userData.id;
-                const offset = seg.userData.offset;
-                
-                // サイン波を組み合わせて「ぐにゃぐにゃ」させる
-                // インデックス(i)を足すことで、後ろから前へ波が伝わるような動きにする
-                const waveX = Math.sin(time * 2 + i * 0.3) * 8;
-                const waveY = Math.cos(time * 1.5 + i * 0.2) * 8;
-                const roll = Math.sin(time * 2 + i * 0.4) * 0.3; // 回転の揺れ
-                const pitch = Math.cos(time * 2 + i * 0.3) * 0.2;
+                // 時間とインデックスでうねりを作る
+                const waveX = Math.sin(time * 1.5 + i * 0.3) * 10;
+                const waveY = Math.cos(time * 1.2 + i * 0.2) * 10;
+                const roll = Math.sin(time * 1.5 + i * 0.4) * 0.2;
 
-                // 基準位置からのオフセットとして適用
                 seg.position.x = seg.userData.basePos.x + waveX;
                 seg.position.y = seg.userData.basePos.y + waveY;
-                
                 seg.rotation.z = roll;
-                seg.rotation.x = seg.userData.baseRot.x + pitch;
 
-                // 古いセグメントの削除
-                if (camera.position.distanceTo(seg.position) > 1000) {
+                // 遠すぎたら削除
+                if (camera.position.distanceTo(seg.position) > 1200) {
                     scene.remove(seg);
                     segments.splice(i, 1);
                 }
             });
 
-            // マウス操作の反映
+            // 視点の微調整
             camera.rotation.x += targetRotX;
             camera.rotation.y += targetRotY;
             if (!isDragging) { targetRotX *= 0.9; targetRotY *= 0.9; }
