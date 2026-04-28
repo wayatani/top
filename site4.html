@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>わやたに | Dark Wobbly Maze</title>
+    <title>わやたに | VOID DRIFT</title>
     <script type="importmap">
         {
             "imports": {
@@ -13,38 +13,32 @@
     </script>
     <style>
         :root {
-            --ui-font: 'Helvetica Neue', Arial, sans-serif;
             --white: #ffffff;
             --black: #000000;
+            --ui-font: 'Helvetica Neue', Arial, sans-serif;
         }
         body { margin: 0; background: var(--black); overflow: hidden; font-family: var(--ui-font); cursor: grab; }
         body:active { cursor: grabbing; }
         
-        /* UIを白抜きにして視認性を確保 */
         #ui-header { position: fixed; top: 40px; left: 40px; z-index: 100; pointer-events: none; }
-        .logo { font-size: 24px; font-weight: 900; border: 2px solid var(--white); padding: 5px 15px; color: var(--white); background: transparent; display: inline-block; pointer-events: auto; letter-spacing: -1px; }
+        .logo { font-size: 24px; font-weight: 900; border: 2px solid var(--white); padding: 5px 15px; color: var(--white); background: transparent; display: inline-block; pointer-events: auto; text-decoration: none; letter-spacing: -1px; }
         
-        #nav-container { position: fixed; right: 40px; top: 50%; transform: translateY(-50%); z-index: 200; display: flex; flex-direction: column; gap: 20px; text-align: right; pointer-events: none; }
-        .side-link { pointer-events: auto; text-decoration: none; color: var(--white); font-weight: 900; font-size: 24px; letter-spacing: 2px; transition: opacity 0.2s, transform 0.2s; display: block; }
-        .side-link:hover { opacity: 0.5; transform: translateX(-10px); }
-        
-        .status { position: fixed; bottom: 20px; left: 20px; font-family: monospace; font-size: 9px; color: var(--white); opacity: 0.5; pointer-events: none; text-transform: uppercase; }
+        /* index.htmlに戻るリンク */
+        .back-link { position: fixed; top: 50px; right: 40px; z-index: 100; color: var(--white); text-decoration: none; font-size: 14px; font-weight: 900; opacity: 0.6; transition: opacity 0.2s; border-bottom: 1px solid var(--white);}
+        .back-link:hover { opacity: 1; }
+
+        .status { position: fixed; bottom: 20px; left: 20px; font-family: monospace; font-size: 9px; color: var(--white); opacity: 0.5; pointer-events: none; text-transform: uppercase; letter-spacing: 1px;}
     </style>
 </head>
 <body>
 
     <div id="ui-header">
-        <h1 class="logo">わやたに</h1>
+        <a href="index.html" class="logo">わやたに</a>
     </div>
 
-    <nav id="nav-container">
-        <a href="#" class="side-link">PROFILE</a>
-        <a href="#" class="side-link">WORKS</a>
-        <a href="#" class="side-link">SHOP</a>
-        <a href="#" class="side-link">CONTACT</a>
-    </nav>
+    <a href="index.html" class="back-link">BACK TO MENU</a>
 
-    <div class="status">MODE: NOIR_DRIFT // FOG: ENABLED // ENTITY: GLB_LOADED</div>
+    <div class="status">PHASE: VOID_DRIFT // ENTITY: FOLLOWING // FOG: EXP2</div>
 
     <script type="module">
         import * as THREE from 'three';
@@ -52,31 +46,32 @@
 
         let scene, camera, renderer, clock;
         let segments = [];
+        let model = null; 
+
+        // カメラ設定
         let isDragging = false;
         let targetRotX = 0, targetRotY = 0;
         let previousMouseX = 0, previousMouseY = 0;
 
-        const UNIT = 40;
+        // 道の生成用設定
+        const UNIT = 50; // 道の1ブロックの長さ
         let currentPos = new THREE.Vector3(0, 0, 0);
-        let currentDir = new THREE.Vector3(0, 0, -1);
-        let pathPoints = [];
-
-        let model = null; // GLBモデル用
-        const loader = new GLTFLoader();
+        let currentDir = new THREE.Vector3(0, 0, -1); // 進行方向
+        let pathPoints = []; // カメラが通る点の配列
+        let lookAtTarget = new THREE.Vector3(); // カメラの注視点
 
         init();
 
         function init() {
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x000000); // 真っ黒
+            scene.background = new THREE.Color(0x000000); 
             
-            // --- フォグ（霧）の設定 ---
-            // 第2引数の数値(0.015)を大きくすると霧が濃くなり、近くまで見えなくなります
-            scene.fog = new THREE.FogExp2(0x000000, 0.012);
+            // --- フォグ（霧）で奥行きを出す ---
+            scene.fog = new THREE.FogExp2(0x000000, 0.008); // 0.008は霧の濃さ
 
+            // カメラ：少し広角にして没入感を出す
             camera = new THREE.PerspectiveCamera(85, window.innerWidth / window.innerHeight, 0.1, 2000);
-            camera.position.set(0, 0, 0);
-
+            
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -84,150 +79,188 @@
 
             clock = new THREE.Clock();
 
-            // 暗闇でもモデルが見えるようにライトを追加
+            // ライト：モデルを照らす
             scene.add(new THREE.AmbientLight(0xffffff, 1.0));
-            const pointLight = new THREE.PointLight(0xffffff, 1000);
+            const pointLight = new THREE.PointLight(0xffffff, 1500, 500);
             camera.add(pointLight); // カメラに追従するライト
             scene.add(camera);
 
             // --- GLBデータの読み込み ---
-            // 'your-model.glb' を自分のファイル名に書き換えてください
+            const loader = new GLTFLoader();
             loader.load('char.glb', (gltf) => {
                 model = gltf.scene;
-                model.scale.set(8, 8, 8); 
+                
+                // モデルのマテリアルを少し発光（Emissive）させてガブリュウ風に
+                model.traverse((child) => {
+                    if (child.isMesh) {
+                        child.material.emissive = new THREE.Color(0x222222);
+                        child.material.emissiveIntensity = 1.0;
+                    }
+                });
+
+                // 初期サイズ調整。モデルが見えない場合はここを調整（例: 1, 1, 1）
+                model.scale.set(10, 10, 10); 
                 scene.add(model);
             }, undefined, (error) => {
-                console.warn("GLBが見つかりません。デフォルトのモデルを待機します。");
+                console.warn("char.glbが見つからないため、モデルは表示されません。");
             });
 
-            // 道の初期生成
-            for (let i = 0; i < 60; i++) spawnSegment();
+            // 道の初期生成（多めに作っておく）
+            for (let i = 0; i < 70; i++) spawnSegment();
 
+            // カメラの初期位置を最初のパス点にセット
+            if(pathPoints.length > 0) {
+                camera.position.copy(pathPoints[0]);
+            }
+
+            // マウス操作
             window.addEventListener('mousedown', (e) => {
                 if (e.target.tagName === 'A') return;
                 isDragging = true; previousMouseX = e.clientX; previousMouseY = e.clientY;
             });
             window.addEventListener('mousemove', (e) => {
                 if (!isDragging) return;
-                targetRotY -= (e.clientX - previousMouseX) * 0.005;
-                targetRotX -= (e.clientY - previousMouseY) * 0.005;
-                targetRotX = Math.max(-0.6, Math.min(0.6, targetRotX));
+                targetRotY -= (e.clientX - previousMouseX) * 0.002; // 感度調整
+                targetRotX -= (e.clientY - previousMouseY) * 0.002;
+                targetRotX = Math.max(-0.6, Math.min(0.6, targetRotX)); // 上下の回転制限
                 previousMouseX = e.clientX; previousMouseY = e.clientY;
             });
             window.addEventListener('mouseup', () => isDragging = false);
-            window.addEventListener('resize', () => {
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight);
-            });
+            window.addEventListener('resize', onWindowResize);
 
             animate();
         }
 
+        // 道（ワイヤーフレーム立方体）を1つ生成
         function spawnSegment() {
             const group = new THREE.Group();
-            // 発光しているように見える白い線
-            const material = new THREE.LineBasicMaterial({ color: 0xffffff });
+            const material = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
             
             const s = UNIT / 2;
+            // 立方体のワイヤーフレーム
             const pts = [
-                [-s, -s, 0], [s, -s, 0], [s, s, 0], [-s, s, 0], [-s, -s, 0],
-                [-s, -s, -UNIT], [s, -s, -UNIT], [s, s, -UNIT], [-s, s, -UNIT], [-s, -s, -UNIT],
-                null, [s, -s, 0], [s, -s, -UNIT], null, [s, s, 0], [s, s, -UNIT], null, [-s, s, 0], [-s, s, -UNIT]
+                [-s, -s, s], [s, -s, s], [s, s, s], [-s, s, s], [-s, -s, s],
+                [-s, -s, -s], [s, -s, -s], [s, s, -s], [-s, s, -s], [-s, -s, -s],
+                null, [s, -s, s], [s, -s, -s], null, [s, s, s], [s, s, -s], null, [-s, s, s], [-s, s, -s]
             ];
             
             let temp = [];
             pts.forEach(p => {
-                if (p === null) { draw(temp, group, material); temp = []; }
+                if (p === null) { drawLines(temp, group, material); temp = []; }
                 else temp.push(new THREE.Vector3(...p));
             });
-            draw(temp, group, material);
+            drawLines(temp, group, material);
 
+            // 配置と回転
             group.position.copy(currentPos);
+            // 進行方向に合わせて立方体を向ける
             group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), currentDir);
             
+            // 基準データを保存
             group.userData.basePos = group.position.clone();
-            group.userData.baseRot = group.rotation.clone();
+            group.userData.id = pathPoints.length;
 
             scene.add(group);
             segments.push(group);
+            
+            // カメラが通る軌跡（パス）として保存
             pathPoints.push(currentPos.clone());
 
+            // 次の立方体の位置を計算
             currentPos.add(currentDir.clone().multiplyScalar(UNIT));
             
-            // 直進性を高くして「道」を形成
+            // 曲がり角の生成ロジック（直進率85%）
             if (Math.random() < 0.15) {
                 const turn = Math.random() > 0.5 ? Math.PI / 2 : -Math.PI / 2;
+                // Y軸（上向き）を軸に回転
                 currentDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), turn).round();
             }
         }
 
-        function draw(pts, group, mat) {
+        function drawLines(pts, group, mat) {
             if (pts.length < 2) return;
             const geom = new THREE.BufferGeometry().setFromPoints(pts);
             group.add(new THREE.Line(geom, mat));
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
         function animate() {
             requestAnimationFrame(animate);
             const time = clock.getElapsedTime();
 
-            // カメラの前進
-            if (pathPoints.length > 10) {
-                const targetPoint = pathPoints[1];
-                const direction = new THREE.Vector3().subVectors(targetPoint, camera.position);
+            // --- カメラの前進（自動） ---
+            if (pathPoints.length > 15) {
+                const targetPoint = pathPoints[1]; // 次のパス点
+                const moveVec = new THREE.Vector3().subVectors(targetPoint, camera.position);
                 
-                if (direction.length() > 2) {
-                    direction.normalize().multiplyScalar(1.0); // 少しゆったり進む
-                    camera.position.add(direction);
-                    const lookAtTarget = pathPoints[5] || targetPoint;
+                // 次の点までの距離が一定以上なら前進
+                if (moveVec.length() > 2) {
+                    moveVec.normalize().multiplyScalar(1.2); // 前進速度
+                    camera.position.add(moveVec);
+                    
+                    // 少し先をスムーズに注視（Lerpでなめらかに）
+                    const lookTarget = pathPoints[6] || targetPoint;
+                    lookAtTarget.lerp(lookTarget, 0.1);
                     camera.lookAt(lookAtTarget);
                 } else {
+                    // 点に到達したら、古いパスを削除して新しい道を先に追加
                     pathPoints.shift();
                     spawnSegment();
                 }
             }
 
-            // --- GLBモデルの浮遊アニメーション ---
+            // --- GLBモデルのふわふわ浮遊・回転（カメラ追従） ---
             if (model) {
-                const t = time * 0.5;
-                // カメラの少し先をふわふわ漂う
-                const driftX = Math.sin(t) * 40;
-                const driftY = Math.cos(t * 1.2) * 20;
-                const forwardOffset = -100; // カメラの100ユニット前方
+                const t = time * 0.6; // アニメーション速度
                 
-                // カメラの向きに合わせて位置を計算
-                const targetPos = new THREE.Vector3(driftX, driftY, forwardOffset);
-                targetPos.applyQuaternion(camera.quaternion);
-                targetPos.add(camera.position);
+                // カメラの少し前方、かつ上下左右にふわふわ漂う座標を計算
+                const driftX = Math.sin(t) * 45; // 左右の揺れ幅
+                const driftY = Math.cos(t * 1.3) * 25; // 上下の揺れ幅
+                const forwardOffset = -120; // カメラの120ユニット前方
+                
+                const localTarget = new THREE.Vector3(driftX, driftY, forwardOffset);
+                
+                // カメラの向き（Quaternion）を適用して、常にカメラの前に来るように変換
+                const worldTarget = localTarget.applyQuaternion(camera.quaternion);
+                worldTarget.add(camera.position);
 
-                model.position.lerp(targetPos, 0.05);
-                model.rotation.y += 0.01;
-                model.rotation.z = Math.sin(t) * 0.2;
+                // Lerpでなめらかに追従
+                model.position.lerp(worldTarget, 0.04);
+                
+                // 回転（ガブリュウ風のゆっくりした無機質な回転）
+                model.rotation.y += 0.005; // Y軸回転
+                model.rotation.z = Math.sin(t) * 0.15; // Z軸の揺らぎ
             }
 
-            // --- 道のぐらぐらアニメーション ---
+            // --- 道（立方体）の個別うねりアニメーション ---
             segments.forEach((seg, i) => {
-                // 時間とインデックスでうねりを作る
-                const waveX = Math.sin(time * 1.5 + i * 0.3) * 10;
-                const waveY = Math.cos(time * 1.2 + i * 0.2) * 10;
-                const roll = Math.sin(time * 1.5 + i * 0.4) * 0.2;
+                // 時間と配列のインデックス(i)を使って、後ろから前へ伝わる波を作る
+                const waveSpeed = 2.0;
+                const waveLength = 0.3;
+                const amplitude = 12.0; // 揺れ幅
+
+                const waveX = Math.sin(time * waveSpeed + i * waveLength) * amplitude;
+                const waveY = Math.cos(time * (waveSpeed * 0.8) + i * (waveLength * 0.8)) * amplitude;
 
                 seg.position.x = seg.userData.basePos.x + waveX;
                 seg.position.y = seg.userData.basePos.y + waveY;
-                seg.rotation.z = roll;
 
-                // 遠すぎたら削除
-                if (camera.position.distanceTo(seg.position) > 1200) {
+                // 遠すぎたら削除してメモリを節約
+                if (camera.position.distanceTo(seg.position) > 1300) {
                     scene.remove(seg);
                     segments.splice(i, 1);
                 }
             });
 
-            // 視点の微調整
+            // マウス操作の慣性適用
             camera.rotation.x += targetRotX;
             camera.rotation.y += targetRotY;
-            if (!isDragging) { targetRotX *= 0.9; targetRotY *= 0.9; }
+            if (!isDragging) { targetRotX *= 0.92; targetRotY *= 0.92; }
 
             renderer.render(scene, camera);
         }
