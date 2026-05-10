@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>わやたに | PIXEL VOID DRIFT - VISUAL BALANCE</title>
+    <title>わやたに | PIXEL VOID DRIFT - FULL SPEC</title>
     <script type="importmap">
         {
             "imports": {
@@ -62,7 +62,6 @@
 
         function init() {
             scene = new THREE.Scene();
-            // 背景を完全な黒に戻し、発光する球体を際立たせる
             scene.background = new THREE.Color(0x000000);
             scene.fog = new THREE.FogExp2(0x000000, 0.0012);
 
@@ -73,13 +72,11 @@
             renderer.setPixelRatio(window.devicePixelRatio * PIXEL_RATIO);
             document.body.appendChild(renderer.domElement);
 
-            // ライト
-            scene.add(new THREE.AmbientLight(0x444444)); // 環境光を少し下げて、自発光を際立たせる
+            scene.add(new THREE.AmbientLight(0x444444));
             const sun = new THREE.DirectionalLight(0xffffff, 2.5);
             sun.position.set(1, 1, 1);
             scene.add(sun);
 
-            // 星屑
             const starGeom = new THREE.BufferGeometry();
             const starPos = [];
             for(let i=0; i<2000; i++) {
@@ -89,40 +86,39 @@
             const particles = new THREE.Points(starGeom, new THREE.PointsMaterial({color: 0xffffff, size: 4}));
             scene.add(particles);
 
-            // GLB読み込み（通常のアイテム）
             const loader = new GLTFLoader();
             loader.load('./char.glb', (gltf) => {
                 for(let i=0; i<30; i++) spawnItem(gltf.scene.clone());
             });
 
-            // ★共通のジオメトリ定義（赤い球も青い球も同じ形、同じサイズ）
-            const sphereGeom = new THREE.IcosahedronGeometry(20, 0); // カクカクした質感
+            // 共通ジオメトリ
+            const sphereGeom = new THREE.IcosahedronGeometry(20, 0);
 
             // 爆弾（赤）
             const bombMat = new THREE.MeshStandardMaterial({ 
                 color: 0xaa0000, 
-                emissive: 0xaa0000, // 深い赤の発光
+                emissive: 0xaa0000, 
                 emissiveIntensity: 0.8,
                 flatShading: true 
             });
             for(let i=0; i<20; i++) {
                 const bomb = new THREE.Mesh(sphereGeom, bombMat);
-                spawnSpawnable(bomb);
+                spawnInitial(bomb);
                 bombs.push(bomb);
             }
 
             // 加速（青）
             const boostMat = new THREE.MeshStandardMaterial({ 
                 color: 0x00ffff, 
-                emissive: 0x00ffff, // 鮮やかな青の発光
-                emissiveIntensity: 0.8, // 赤と同じ強さの発光
+                emissive: 0x00ffff, 
+                emissiveIntensity: 0.8,
                 flatShading: true,
                 transparent: true,
-                opacity: 0.9 // わずかに透明感を残してアイテム感を出す
+                opacity: 0.9
             });
             for(let i=0; i<15; i++) {
                 const boost = new THREE.Mesh(sphereGeom, boostMat);
-                spawnSpawnable(boost);
+                spawnInitial(boost);
                 boosts.push(boost);
             }
 
@@ -141,8 +137,7 @@
             items.push(model);
         }
 
-        // 赤玉、青玉の初期配置用共通関数
-        function spawnSpawnable(obj) {
+        function spawnInitial(obj) {
             obj.position.set(THREE.MathUtils.randFloatSpread(3000), THREE.MathUtils.randFloatSpread(3000), THREE.MathUtils.randFloatSpread(3000));
             scene.add(obj);
         }
@@ -151,7 +146,6 @@
             const fwd = new THREE.Vector3();
             camera.getWorldDirection(fwd);
             const targetPos = new THREE.Vector3().copy(camera.position).add(fwd.multiplyScalar(distance));
-            
             obj.position.copy(targetPos);
             obj.position.x += THREE.MathUtils.randFloatSpread(1500);
             obj.position.y += THREE.MathUtils.randFloatSpread(1500);
@@ -166,12 +160,10 @@
             camera.getWorldDirection(dir);
             camera.position.add(dir.multiplyScalar(currentSpeed));
 
-            // 速度とFOVを元に戻す
             currentSpeed += (BASE_SPEED - currentSpeed) * 0.02;
             camera.fov += (BASE_FOV - camera.fov) * 0.06;
             camera.updateProjectionMatrix();
 
-            // 回転
             lon += (targetLon - lon) * 0.1;
             lat += (targetLat - lat) * 0.1;
             lat = Math.max(-85, Math.min(85, lat));
@@ -179,7 +171,6 @@
             target.setFromSphericalCoords(1, THREE.MathUtils.degToRad(90-lat), THREE.MathUtils.degToRad(lon)).add(camera.position);
             camera.lookAt(target);
 
-            // 当たり判定：GLBアイテム
             items.forEach((item) => {
                 item.rotation.y += 0.04;
                 if (camera.position.distanceTo(item.position) < 70) {
@@ -191,19 +182,15 @@
                 }
             });
 
-            // 当たり判定：爆弾（赤玉）
             bombs.forEach(bomb => {
                 bomb.rotation.x += 0.05;
-                // 当たり判定距離を調整
                 if (camera.position.distanceTo(bomb.position) < 45) gameOver();
                 if (camera.position.distanceTo(bomb.position) > 4000) respawn(bomb, 3000);
             });
 
-            // 当たり判定：加速アイテム（青玉）
             boosts.forEach(boost => {
                 boost.rotation.y += 0.08;
                 boost.rotation.z += 0.05;
-                // サイズが同じなので、当たり判定距離も赤玉と統一
                 if (camera.position.distanceTo(boost.position) < 45) {
                     currentSpeed = BOOST_SPEED;
                     camera.fov = BOOST_FOV;
