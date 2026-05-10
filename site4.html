@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>わやたに | PIXEL VOID DRIFT</title>
+    <title>わやたに | PIXEL VOID DRIFT - BOOST</title>
     <script type="importmap">
         {
             "imports": {
@@ -15,7 +15,6 @@
         :root { --white: #ffffff; --black: #000000; --ui-font: 'Helvetica Neue', Arial, sans-serif; }
         body { margin: 0; background: var(--black); overflow: hidden; font-family: var(--ui-font); cursor: grab; }
         
-        /* ドット感を出すためにCanvasにアンチエイリアスをかけない */
         canvas { 
             image-rendering: pixelated; 
             image-rendering: crisp-edges;
@@ -24,7 +23,6 @@
         #ui-header { position: fixed; top: 40px; left: 40px; z-index: 1000; }
         .logo { font-size: 24px; font-weight: 900; border: 2px solid var(--white); padding: 5px 15px; color: var(--white); text-decoration: none; letter-spacing: -1px; }
         
-        /* 復活したナビゲーションタブ */
         #nav-container { 
             position: fixed; right: 40px; top: 50%; transform: translateY(-50%); 
             z-index: 1000; display: flex; flex-direction: column; gap: 25px; text-align: right; 
@@ -67,32 +65,35 @@
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
         let scene, camera, renderer, clock;
-        let items = [], bombs = [], particles;
+        let items = [], bombs = [], boosts = [], particles;
         let score = 0, isGameOver = false;
         let lon = 0, lat = 0, targetLon = 0, targetLat = 0, pointerX = 0, pointerY = 0, isDragging = false;
 
-        // ★ドット絵解像度の倍率（0.25だとかなり荒く、0.5だと適度なドット感）
+        // スピード管理用変数
+        const BASE_SPEED = 2.8;
+        const BOOST_SPEED = 14.0;
+        const BASE_FOV = 75;
+        const BOOST_FOV = 100;
+        let currentSpeed = BASE_SPEED;
+
         const PIXEL_RATIO = 0.4; 
 
         init();
 
         function init() {
             scene = new THREE.Scene();
-            // 視認性を上げるために背景を完全な黒から「深い紺色」へ
             scene.background = new THREE.Color(0x050510);
             scene.fog = new THREE.FogExp2(0x050510, 0.0008);
 
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 5000);
+            camera = new THREE.PerspectiveCamera(BASE_FOV, window.innerWidth/window.innerHeight, 0.1, 5000);
             
-            renderer = new THREE.WebGLRenderer({ antialias: false }); // ドット絵なのでアンチエイリアスOFF
+            renderer = new THREE.WebGLRenderer({ antialias: false });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            // 解像度をわざと下げる
             renderer.setPixelRatio(window.devicePixelRatio * PIXEL_RATIO);
             document.body.appendChild(renderer.domElement);
 
             clock = new THREE.Clock();
 
-            // ライト：視認性のためにAmbientを強く、Spotlightを追加
             scene.add(new THREE.AmbientLight(0xffffff, 1.5));
             const sun = new THREE.DirectionalLight(0xffffff, 2);
             sun.position.set(1, 1, 1);
@@ -108,14 +109,17 @@
             particles = new THREE.Points(starGeom, new THREE.PointsMaterial({color: 0xffffff, size: 4}));
             scene.add(particles);
 
-            // GLB読み込み
+            // GLB読み込み（通常のアイテム）
             const loader = new GLTFLoader();
             loader.load('./char.glb', (gltf) => {
                 for(let i=0; i<30; i++) spawnItem(gltf.scene.clone());
-            });
+            }, undefined, (e) => console.error("Model loading error: ", e));
 
             // 爆弾生成
             for(let i=0; i<25; i++) spawnBomb();
+
+            // 加速アイテム（青玉）生成
+            for(let i=0; i<15; i++) spawnBoost();
 
             document.addEventListener('pointerdown', e => { if(e.target.closest('#nav-container') || e.target.closest('#ui-header')) return; isDragging = true; pointerX = e.clientX; pointerY = e.clientY; });
             document.addEventListener('pointermove', e => { if(!isDragging) return; targetLon -= (e.clientX - pointerX)*0.5; targetLat -= (e.clientY - pointerY)*0.4; pointerX = e.clientX; pointerY = e.clientY; });
@@ -127,13 +131,13 @@
 
         function spawnItem(model) {
             model.position.set(THREE.MathUtils.randFloatSpread(3000), THREE.MathUtils.randFloatSpread(3000), THREE.MathUtils.randFloatSpread(3000));
-            model.scale.set(35, 35, 35); // 少し大きく
+            model.scale.set(35, 35, 35);
             scene.add(model);
             items.push(model);
         }
 
         function spawnBomb() {
-            const geom = new THREE.IcosahedronGeometry(20, 0); // カクカクした形にする
+            const geom = new THREE.IcosahedronGeometry(20, 0);
             const mat = new THREE.MeshPhongMaterial({ color: 0xff0000, emissive: 0x330000, flatShading: true });
             const bomb = new THREE.Mesh(geom, mat);
             bomb.position.set(THREE.MathUtils.randFloatSpread(3000), THREE.MathUtils.randFloatSpread(3000), THREE.MathUtils.randFloatSpread(3000));
@@ -141,14 +145,36 @@
             bombs.push(bomb);
         }
 
+        function spawnBoost() {
+            const geom = new THREE.SphereGeometry(18, 8, 8);
+            const mat = new THREE.MeshPhongMaterial({ 
+                color: 0x00ffff, 
+                emissive: 0x00aaff, 
+                transparent: true, 
+                opacity: 0.9,
+                flatShading: true 
+            });
+            const boost = new THREE.Mesh(geom, mat);
+            boost.position.set(THREE.MathUtils.randFloatSpread(3000), THREE.MathUtils.randFloatSpread(3000), THREE.MathUtils.randFloatSpread(3000));
+            scene.add(boost);
+            boosts.push(boost);
+        }
+
         function animate() {
             if (isGameOver) return;
             requestAnimationFrame(animate);
 
+            // 前進
             const dir = new THREE.Vector3();
             camera.getWorldDirection(dir);
-            camera.position.add(dir.multiplyScalar(2.8));
+            camera.position.add(dir.multiplyScalar(currentSpeed));
 
+            // 徐々に元の速度とFOVに戻す（線形補間）
+            currentSpeed += (BASE_SPEED - currentSpeed) * 0.02;
+            camera.fov += (BASE_FOV - camera.fov) * 0.05;
+            camera.updateProjectionMatrix();
+
+            // カメラ回転
             lon += (targetLon - lon) * 0.1;
             lat += (targetLat - lat) * 0.1;
             lat = Math.max(-85, Math.min(85, lat));
@@ -161,18 +187,32 @@
                 item.rotation.y += 0.04;
                 if (camera.position.distanceTo(item.position) < 60) {
                     score += 100;
-                    document.getElementById('score-board').innerText = score.toString().padStart(5, '0');
+                    updateScore();
                     respawn(item, 2500);
-                } else if (camera.position.distanceTo(item.position) > 3000) {
+                } else if (camera.position.distanceTo(item.position) > 3500) {
                     respawn(item, 2000);
                 }
             });
 
-            // 当たり判定：爆弾（赤く光るトゲトゲ）
+            // 当たり判定：爆弾
             bombs.forEach(bomb => {
                 bomb.rotation.x += 0.05;
                 if (camera.position.distanceTo(bomb.position) < 40) gameOver();
-                if (camera.position.distanceTo(bomb.position) > 3000) respawn(bomb, 2500);
+                if (camera.position.distanceTo(bomb.position) > 3500) respawn(bomb, 2500);
+            });
+
+            // 当たり判定：加速アイテム（青玉）
+            boosts.forEach(boost => {
+                boost.rotation.y += 0.1;
+                if (camera.position.distanceTo(boost.position) < 50) {
+                    currentSpeed = BOOST_SPEED; // 加速
+                    camera.fov = BOOST_FOV;     // 視野角を広げる演出
+                    score += 50;
+                    updateScore();
+                    respawn(boost, 3000);
+                } else if (camera.position.distanceTo(boost.position) > 3500) {
+                    respawn(boost, 2500);
+                }
             });
 
             renderer.render(scene, camera);
@@ -184,6 +224,11 @@
             obj.position.copy(camera.position).add(fwd.multiplyScalar(distance));
             obj.position.x += THREE.MathUtils.randFloatSpread(2000);
             obj.position.y += THREE.MathUtils.randFloatSpread(2000);
+            obj.position.z += THREE.MathUtils.randFloatSpread(500);
+        }
+
+        function updateScore() {
+            document.getElementById('score-board').innerText = score.toString().padStart(5, '0');
         }
 
         function gameOver() {
