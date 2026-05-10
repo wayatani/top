@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>わやたに | PIXEL VOID DRIFT - FULL SPEC</title>
+    <title>わやたに | PIXEL VOID DRIFT</title>
     <script type="importmap">
         {
             "imports": {
@@ -15,19 +15,25 @@
         :root { --white: #ffffff; --black: #000000; --ui-font: 'Helvetica Neue', Arial, sans-serif; }
         body { margin: 0; background: var(--black); overflow: hidden; font-family: var(--ui-font); cursor: grab; }
         canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
+        
+        /* ロゴをクリックするとゲームがリセットされる設定 */
         #ui-header { position: fixed; top: 40px; left: 40px; z-index: 1000; }
-        .logo { font-size: 24px; font-weight: 900; border: 2px solid var(--white); padding: 5px 15px; color: var(--white); text-decoration: none; letter-spacing: -1px; }
+        .logo { font-size: 24px; font-weight: 900; border: 2px solid var(--white); padding: 5px 15px; color: var(--white); text-decoration: none; letter-spacing: -1px; cursor: pointer; }
+        
         #nav-container { position: fixed; right: 40px; top: 50%; transform: translateY(-50%); z-index: 1000; display: flex; flex-direction: column; gap: 25px; text-align: right; }
         .side-link { color: var(--white); text-decoration: none; font-weight: 900; font-size: 24px; letter-spacing: 2px; transition: 0.3s; text-shadow: 2px 2px 4px rgba(0,0,0,1); }
         .side-link:hover { opacity: 0.5; transform: translateX(-10px); }
+        
         #score-board { position: fixed; top: 40px; right: 40px; color: var(--white); font-size: 32px; font-weight: 900; z-index: 1000; letter-spacing: 2px; text-shadow: 2px 2px 0px #000; }
+        
         #game-over { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 2000; color: var(--white); }
         .retry-btn { margin-top: 20px; padding: 10px 30px; border: 2px solid var(--white); background: none; color: var(--white); cursor: pointer; font-weight: 900; }
     </style>
 </head>
 <body>
 
-    <div id="ui-header"><a href="index.html" class="logo">わやたに</a></div>
+    <!-- ロゴをクリックでページをリロード（ゲームリセット） -->
+    <div id="ui-header"><a onclick="location.reload()" class="logo">わやたに</a></div>
     <div id="score-board">00000</div>
 
     <div id="game-over">
@@ -36,10 +42,10 @@
     </div>
 
     <nav id="nav-container">
-        <a href="index.html?page=profile" class="side-link">PROFILE</a>
-        <a href="index.html?page=works" class="side-link">WORKS</a>
-        <a href="index.html?page=shop" class="side-link">SHOP</a>
-        <a href="index.html?page=contact" class="side-link">CONTACT</a>
+        <a href="?page=profile" class="side-link">PROFILE</a>
+        <a href="?page=works" class="side-link">WORKS</a>
+        <a href="?page=shop" class="side-link">SHOP</a>
+        <a href="?page=contact" class="side-link">CONTACT</a>
     </nav>
 
     <script type="module">
@@ -51,10 +57,10 @@
         let score = 0, isGameOver = false;
         let lon = 0, lat = 0, targetLon = 0, targetLat = 0, pointerX = 0, pointerY = 0, isDragging = false;
 
-        const BASE_SPEED = 3.0;
-        const BOOST_SPEED = 15.0;
+        const BASE_SPEED = 3.2;
+        const BOOST_SPEED = 18.0;
         const BASE_FOV = 75;
-        const BOOST_FOV = 110;
+        const BOOST_FOV = 115;
         let currentSpeed = BASE_SPEED;
         const PIXEL_RATIO = 0.4; 
 
@@ -63,27 +69,28 @@
         function init() {
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x000000);
-            scene.fog = new THREE.FogExp2(0x000000, 0.0012);
+            scene.fog = new THREE.FogExp2(0x000000, 0.001);
 
-            camera = new THREE.PerspectiveCamera(BASE_FOV, window.innerWidth/window.innerHeight, 0.1, 5000);
+            camera = new THREE.PerspectiveCamera(BASE_FOV, window.innerWidth/window.innerHeight, 0.1, 6000);
             
             renderer = new THREE.WebGLRenderer({ antialias: false });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio * PIXEL_RATIO);
             document.body.appendChild(renderer.domElement);
 
-            scene.add(new THREE.AmbientLight(0x444444));
+            scene.add(new THREE.AmbientLight(0x666666));
             const sun = new THREE.DirectionalLight(0xffffff, 2.5);
             sun.position.set(1, 1, 1);
             scene.add(sun);
 
+            // 星屑
             const starGeom = new THREE.BufferGeometry();
             const starPos = [];
-            for(let i=0; i<2000; i++) {
-                starPos.push(THREE.MathUtils.randFloatSpread(4000), THREE.MathUtils.randFloatSpread(4000), THREE.MathUtils.randFloatSpread(4000));
+            for(let i=0; i<2500; i++) {
+                starPos.push(THREE.MathUtils.randFloatSpread(5000), THREE.MathUtils.randFloatSpread(5000), THREE.MathUtils.randFloatSpread(5000));
             }
             starGeom.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3));
-            const particles = new THREE.Points(starGeom, new THREE.PointsMaterial({color: 0xffffff, size: 4}));
+            const particles = new THREE.Points(starGeom, new THREE.PointsMaterial({color: 0xffffff, size: 3}));
             scene.add(particles);
 
             const loader = new GLTFLoader();
@@ -92,33 +99,35 @@
             });
 
             // 共通ジオメトリ
-            const sphereGeom = new THREE.IcosahedronGeometry(20, 0);
+            const sphereGeom = new THREE.IcosahedronGeometry(22, 0);
 
             // 爆弾（赤）
             const bombMat = new THREE.MeshStandardMaterial({ 
-                color: 0xaa0000, 
-                emissive: 0xaa0000, 
-                emissiveIntensity: 0.8,
+                color: 0xff0000, 
+                emissive: 0x660000, 
+                emissiveIntensity: 1.5,
                 flatShading: true 
             });
-            for(let i=0; i<20; i++) {
+            for(let i=0; i<25; i++) {
                 const bomb = new THREE.Mesh(sphereGeom, bombMat);
-                spawnInitial(bomb);
+                spawnInitial(bomb, 2000); // 周囲に配置
                 bombs.push(bomb);
             }
 
-            // 加速（青）
+            // 加速（青）- 必ずカメラの前方に現れるように配置を工夫
             const boostMat = new THREE.MeshStandardMaterial({ 
                 color: 0x00ffff, 
                 emissive: 0x00ffff, 
-                emissiveIntensity: 0.8,
+                emissiveIntensity: 2.0, // 視認性のために強く発光
                 flatShading: true,
                 transparent: true,
                 opacity: 0.9
             });
             for(let i=0; i<15; i++) {
                 const boost = new THREE.Mesh(sphereGeom, boostMat);
-                spawnInitial(boost);
+                // 起動時に目の前にいくつか見えるように配置
+                boost.position.set(THREE.MathUtils.randFloatSpread(1000), THREE.MathUtils.randFloatSpread(1000), -500 - Math.random() * 2000);
+                scene.add(boost);
                 boosts.push(boost);
             }
 
@@ -131,25 +140,27 @@
         }
 
         function spawnItem(model) {
-            model.position.set(THREE.MathUtils.randFloatSpread(2500), THREE.MathUtils.randFloatSpread(2500), THREE.MathUtils.randFloatSpread(2500));
-            model.scale.set(35, 35, 35);
+            model.position.set(THREE.MathUtils.randFloatSpread(3000), THREE.MathUtils.randFloatSpread(3000), THREE.MathUtils.randFloatSpread(3000));
+            model.scale.set(38, 38, 38);
             scene.add(model);
             items.push(model);
         }
 
-        function spawnInitial(obj) {
-            obj.position.set(THREE.MathUtils.randFloatSpread(3000), THREE.MathUtils.randFloatSpread(3000), THREE.MathUtils.randFloatSpread(3000));
+        function spawnInitial(obj, range) {
+            obj.position.set(THREE.MathUtils.randFloatSpread(range), THREE.MathUtils.randFloatSpread(range), THREE.MathUtils.randFloatSpread(range));
             scene.add(obj);
         }
 
+        // 重要：進行方向の前方にリスポーンさせる
         function respawn(obj, distance) {
             const fwd = new THREE.Vector3();
             camera.getWorldDirection(fwd);
             const targetPos = new THREE.Vector3().copy(camera.position).add(fwd.multiplyScalar(distance));
+            
             obj.position.copy(targetPos);
-            obj.position.x += THREE.MathUtils.randFloatSpread(1500);
-            obj.position.y += THREE.MathUtils.randFloatSpread(1500);
-            obj.position.z += THREE.MathUtils.randFloatSpread(1500);
+            obj.position.x += THREE.MathUtils.randFloatSpread(1200);
+            obj.position.y += THREE.MathUtils.randFloatSpread(1200);
+            obj.position.z += THREE.MathUtils.randFloatSpread(1200);
         }
 
         function animate() {
@@ -160,8 +171,8 @@
             camera.getWorldDirection(dir);
             camera.position.add(dir.multiplyScalar(currentSpeed));
 
-            currentSpeed += (BASE_SPEED - currentSpeed) * 0.02;
-            camera.fov += (BASE_FOV - camera.fov) * 0.06;
+            currentSpeed += (BASE_SPEED - currentSpeed) * 0.015;
+            camera.fov += (BASE_FOV - camera.fov) * 0.05;
             camera.updateProjectionMatrix();
 
             lon += (targetLon - lon) * 0.1;
@@ -173,31 +184,30 @@
 
             items.forEach((item) => {
                 item.rotation.y += 0.04;
-                if (camera.position.distanceTo(item.position) < 70) {
+                if (camera.position.distanceTo(item.position) < 80) {
                     score += 100;
                     updateScore();
-                    respawn(item, 3000);
-                } else if (camera.position.distanceTo(item.position) > 4000) {
+                    respawn(item, 3500);
+                } else if (camera.position.distanceTo(item.position) > 4500) {
                     respawn(item, 3000);
                 }
             });
 
             bombs.forEach(bomb => {
                 bomb.rotation.x += 0.05;
-                if (camera.position.distanceTo(bomb.position) < 45) gameOver();
-                if (camera.position.distanceTo(bomb.position) > 4000) respawn(bomb, 3000);
+                if (camera.position.distanceTo(bomb.position) < 50) gameOver();
+                if (camera.position.distanceTo(bomb.position) > 4500) respawn(bomb, 3000);
             });
 
             boosts.forEach(boost => {
-                boost.rotation.y += 0.08;
-                boost.rotation.z += 0.05;
-                if (camera.position.distanceTo(boost.position) < 45) {
+                boost.rotation.y += 0.1;
+                if (camera.position.distanceTo(boost.position) < 60) {
                     currentSpeed = BOOST_SPEED;
                     camera.fov = BOOST_FOV;
                     score += 50;
                     updateScore();
-                    respawn(boost, 3500);
-                } else if (camera.position.distanceTo(boost.position) > 4000) {
+                    respawn(boost, 4000);
+                } else if (camera.position.distanceTo(boost.position) > 4500) {
                     respawn(boost, 3000);
                 }
             });
